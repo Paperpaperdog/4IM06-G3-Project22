@@ -1,4 +1,3 @@
-# 4IM06-G3-Project22
 
 Minimal clean-room implementation of the core method in
 `resampling_detection (1).pdf`.
