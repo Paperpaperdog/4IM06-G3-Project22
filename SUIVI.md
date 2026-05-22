@@ -35,3 +35,32 @@ Continue implementing the project baseline and improve understanding of method d
 - Run controlled experiments to verify baseline behavior.
 - Improve understanding of implementation details and record observations.
 - Prepare a short list of possible future-work experiments.
+
+# Meet May 22th (W3)
+This meeting focused on scope control and next-step direction choice.
+
+### Questions asked and answers:
+1. Appendix E in the paper mentions the non-aligned case. Should we implement it now?
+- Answer: No. Keep the simplest aligned implementation first (the current one).
+
+2. For RAISE-1K, TIFF images are slow to process. Should we add extra acceleration code from the paper?
+- Answer: No for now. Convert TIFF to PNG and continue experiments.
+
+### Main idea of project:
+Stay focused on implementing and validating the aligned baseline, while running small pilot studies for future directions.
+
+### General project steps:
+1. Keep current aligned pipeline as the main implementation track.
+2. Use TIFF -> PNG preprocessing for practical runtime.
+3. Run short pilot experiments to decide the next main direction.
+
+### Future work / inspiration:
+1. **Idea 1 (JPEG / x8 / x16):** test whether compression-related periodic signals can be distinguished from true resampling cues.
+2. **Idea 2 (CNN with k = -1, 0, 1):** test which correlation pattern is strongest, while temporarily neglecting minor low-probability cases.
+3. For Idea 2, focus not only on peak location but also on other mathematical aspects (e.g., peak height, width, shape, side structures) for fast and direct analysis before deep learning.
+
+### TODO this week:
+- Convert selected RAISE TIFF samples to PNG and prepare a clean experiment subset.
+- Start a first pilot for Idea 1 (JPEG/x8/x16 confusion check).
+- Start a first pilot for Idea 2 (k = -1, 0, 1 comparison, including shape-related metrics beyond location).
+- Compare pilot outcomes and decide one main direction for the next stage.
