@@ -1,0 +1,17 @@
+image_id,source_size,target_size,method,axis,best_distance,best_nfa,true_rank,top_candidate,top_score,result_dir
+r000da54ft,256,384,nearest,vertical,128,3.17173e-64,2,128,120.574,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_nearest
+r000da54ft,256,384,nearest,horizontal,128,1.11409e-51,2,128,100.421,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_nearest
+r000da54ft,256,384,bilinear,vertical,256,2.229e-59,2,128,111.108,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_bilinear
+r000da54ft,256,384,bilinear,horizontal,256,1.04035e-72,2,128,138.812,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_bilinear
+r000da54ft,256,384,bicubic,vertical,128,9.97319e-49,2,128,96.0023,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_bicubic
+r000da54ft,256,384,bicubic,horizontal,128,9.97319e-49,2,128,96.0023,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_bicubic
+r000da54ft,256,384,lanczos,vertical,128,1.2788e-27,2,128,51.4594,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_lanczos
+r000da54ft,256,384,lanczos,horizontal,128,5.12674e-30,2,128,53.8563,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_256_target_384_lanczos
+r000da54ft,512,384,nearest,vertical,256,8.69108e-20,3,128,37.0756,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_nearest
+r000da54ft,512,384,nearest,horizontal,128,8.50616e-14,3,128,25.211,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_nearest
+r000da54ft,512,384,bilinear,vertical,86,1.05078,20,103,0,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_bilinear
+r000da54ft,512,384,bilinear,horizontal,312,0.34287,,312,0.46487,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_bilinear
+r000da54ft,512,384,bicubic,vertical,256,0.00747938,3,128,3.66642,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_bicubic
+r000da54ft,512,384,bicubic,horizontal,256,8.70567e-05,3,128,6.18633,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_bicubic
+r000da54ft,512,384,lanczos,vertical,36,0.103269,,348,0.986032,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_lanczos
+r000da54ft,512,384,lanczos,horizontal,350,0.028821,,350,1.54029,test_results/controlled_resampling_raise1_sample/cases/r000da54ft/source_512_target_384_lanczos
