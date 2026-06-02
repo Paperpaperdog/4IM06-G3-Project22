@@ -1,0 +1,5 @@
+raise_png/*.png
+raise_png/preview_384/
+generated/
+pilot_results/*.csv
+!pilot_results/PILOT_SUMMARY.md

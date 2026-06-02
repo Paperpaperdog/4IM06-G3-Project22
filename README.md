@@ -46,3 +46,34 @@ python3 demo_resampling_detection.py
    law with probability `1 / (2r + 1)`.
 8. The NFA is the binomial tail probability multiplied by the number of tested
    distances. Small NFA means an unusually repeated spectral correlation.
+
+## W3 pilots (SUIVI week 3)
+
+Implements the four TODO items: RAISE/fallback PNG subset, Idea 1 (JPEG/x8),
+Idea 2 (k ∈ {-1,0,1} + shape metrics), and comparison summary.
+
+```bash
+cd 4IM06-G3-Project22
+
+# RAISE-1k: place RAISE_1k.csv in data/raise_raw/ (from unitn download page),
+# then download TIFFs and run pilots:
+python run_pilots.py --raise-dir data/raise_raw --download --max-images 10
+
+# Or if you already extracted TIFF files into data/raise_raw/tiff/:
+python run_pilots.py --raise-dir data/raise_raw --max-images 10
+
+# Or step by step:
+python -m pilots.prepare_subset --max-images 5
+python -m pilots.idea1_jpeg
+python -m pilots.idea2_k_groups
+python -m pilots.compare
+```
+
+Outputs:
+
+- `data/manifest.csv` — PNG subset metadata
+- `data/generated/` — transformed images
+- `data/pilot_results/idea1_results.csv`, `idea2_results.csv`
+- `data/pilot_results/PILOT_SUMMARY.md` — comparison and recommended direction
+
+Without RAISE TIFFs, `prepare_subset` uses `../img/*.png` and skimage builtins.
