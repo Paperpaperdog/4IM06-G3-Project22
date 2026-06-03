@@ -845,7 +845,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# test分两类（四类）检测效果
-# jpeg compression和resample顺序的影响
-# 训练中的compression和resampling factor选择的影响（可以先固定？）
