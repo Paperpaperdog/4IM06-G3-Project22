@@ -12,3 +12,19 @@ test_results/**/*.png
 test_results/**/*.tif
 test_results/**/*.tiff
 test_results/**/detection_summary_limit*.csv
+
+# Spectral mask experiment generated files
+spectral-mask-resampling/data/raw/
+spectral-mask-resampling/data/processed/
+spectral-mask-resampling/data/splits/
+spectral-mask-resampling/outputs/
+spectral-mask-resampling/**/*.pt
+spectral-mask-resampling/**/*.pth
+spectral-mask-resampling/**/*.npy
+spectral-mask-resampling/**/*.npz
+spectral-mask-resampling/**/*.csv
+spectral-mask-resampling/**/*.png
+spectral-mask-resampling/**/__pycache__/
+spectral-mask-resampling/.DS_Store
+spectral-mask-resampling/.venv/
+spectral-mask-resampling/.matplotlib-cache/
