@@ -1,0 +1,6 @@
+crop: null
+direction: both
+input: C:\Users\22863\Desktop\IMA\IMA06\4IM06-G3-Project22\data\protocol_dataset\samples\00000001_r001d260dt_p64_r320_t384.png
+is_jpeg: false
+out_folder: C:\Users\22863\Desktop\IMA\IMA06\4IM06-G3-Project22\data\protocol_dataset\external_outputs\00000001
+preproc: rt
