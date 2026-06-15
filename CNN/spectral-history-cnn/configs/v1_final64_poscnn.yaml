@@ -1,7 +1,10 @@
 experiment_name: v1_final64_poscnn
 
 paths:
-  raise_dir: /path/to/RAISE-1k
+  # Relative to this project root. The CSV contains RAISE TIFF URLs.
+  raise_csv: ../../data/RAISE_1k.csv
+  raise_dir: null
+  image_cache_dir: data/raw/raise_tiff
   split_json: data/splits/raise_split_seed123.json
   processed_dir: data/processed/v1_final64_tv_rfft
   output_dir: outputs/v1_final64_poscnn
@@ -23,6 +26,8 @@ data:
   test_samples_per_class: 1500
   jpeg_quality: 80
   interpolation: bicubic
+  csv_id_column: File
+  csv_url_column: TIFF
   seed: 123
 
 preprocessing:

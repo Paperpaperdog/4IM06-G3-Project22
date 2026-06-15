@@ -92,11 +92,30 @@ PY
 
 ## Data Assumption
 
-Use RAISE-1k as the source image folder. The scripts search recursively for:
+This version uses the RAISE CSV metadata file and downloads the TIFF image URL on demand.
 
 ```text
-.jpg .jpeg .png .tif .tiff .bmp .webp
+../../data/RAISE_1k.csv
 ```
+
+The relative path above is from this project root:
+
+```text
+CNN/spectral-history-cnn/
+```
+
+The CSV must contain:
+
+- `File`: image id, for example `r000da54ft`
+- `TIFF`: direct TIFF URL, for example `http://193.205.194.113/RAISE/TIFF/r000da54ft.TIF`
+
+Downloaded TIFF files are cached here:
+
+```text
+data/raw/raise_tiff/
+```
+
+The cache is reused, so each source image is downloaded only once.
 
 The split is by source image, not by generated patch:
 
@@ -114,20 +133,28 @@ Scientific caveat for v1: `original` uses native `64x64` crops, while `downsampl
 
 ## Configure Paths
 
-Either edit `configs/v1_final64_poscnn.yaml`:
+The default config already uses relative paths:
 
 ```yaml
 paths:
-  raise_dir: /path/to/RAISE-1k
+  raise_csv: ../../data/RAISE_1k.csv
+  image_cache_dir: data/raw/raise_tiff
+  split_json: data/splits/raise_split_seed123.json
+  processed_dir: data/processed/v1_final64_tv_rfft
+  output_dir: outputs/v1_final64_poscnn
+
+data:
+  csv_id_column: File
+  csv_url_column: TIFF
 ```
 
-or pass the RAISE directory through the shell:
+If your CSV is somewhere else on the server, either edit the YAML or pass it through the shell:
 
 ```bash
-export RAISE_DIR=/path/to/RAISE-1k
+export RAISE_CSV=/path/to/RAISE_1k.csv
 ```
 
-The provided run scripts use `RAISE_DIR` if it is set.
+The provided prepare script uses `RAISE_CSV` if it is set. If not, it uses `../../data/RAISE_1k.csv`.
 
 ## Full Version 1 Run
 
@@ -135,7 +162,7 @@ From the project root:
 
 ```bash
 chmod +x scripts/*.sh
-export RAISE_DIR=/path/to/RAISE-1k
+export RAISE_CSV=../../data/RAISE_1k.csv
 
 scripts/run_v1_prepare.sh
 scripts/run_v1_train.sh
@@ -145,7 +172,7 @@ scripts/run_v1_eval.sh
 The prepare script does two things:
 
 1. Creates `data/splits/raise_split_seed123.json`.
-2. Generates cached spectra under `data/processed/v1_final64_tv_rfft/`.
+2. Downloads source TIFFs into `data/raw/raise_tiff/` as needed and generates cached spectra under `data/processed/v1_final64_tv_rfft/`.
 
 The train script uses one GPU:
 
@@ -178,10 +205,12 @@ Before the full run, use a small split and small cached dataset.
 
 ```bash
 export PYTHONPATH=.
-export RAISE_DIR=/path/to/RAISE-1k
+export RAISE_CSV=../../data/RAISE_1k.csv
 
 python src/data/split_raise.py \
-  --input-dir "$RAISE_DIR" \
+  --csv "$RAISE_CSV" \
+  --id-column File \
+  --url-column TIFF \
   --output-json data/splits/raise_split_debug_seed123.json \
   --train 20 \
   --val 5 \
@@ -190,8 +219,8 @@ python src/data/split_raise.py \
 
 python src/data/preprocess_spectra.py \
   --config configs/v1_final64_poscnn.yaml \
-  --raise-dir "$RAISE_DIR" \
   --split-json data/splits/raise_split_debug_seed123.json \
+  --image-cache-dir data/raw/debug_raise_tiff \
   --processed-dir data/processed/debug_v1_final64_tv_rfft \
   --limit-samples 100
 
@@ -298,6 +327,10 @@ The model outputs logits:
 Preprocessing writes:
 
 ```text
+data/raw/raise_tiff/
+  r000da54ft.TIF
+  ...
+
 data/processed/v1_final64_tv_rfft/
   train_spectra.npy
   train_labels.npy

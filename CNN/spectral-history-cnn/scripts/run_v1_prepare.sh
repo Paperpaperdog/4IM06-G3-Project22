@@ -3,10 +3,12 @@ set -euo pipefail
 
 export PYTHONPATH=.
 
-RAISE_DIR="${RAISE_DIR:-/path/to/RAISE-1k}"
+RAISE_CSV="${RAISE_CSV:-../../data/RAISE_1k.csv}"
 
 python src/data/split_raise.py \
-  --input-dir "$RAISE_DIR" \
+  --csv "$RAISE_CSV" \
+  --id-column File \
+  --url-column TIFF \
   --output-json data/splits/raise_split_seed123.json \
   --train 700 \
   --val 150 \
@@ -15,5 +17,5 @@ python src/data/split_raise.py \
 
 python src/data/preprocess_spectra.py \
   --config configs/v1_final64_poscnn.yaml \
-  --raise-dir "$RAISE_DIR" \
-  --split-json data/splits/raise_split_seed123.json
+  --split-json data/splits/raise_split_seed123.json \
+  --image-cache-dir data/raw/raise_tiff

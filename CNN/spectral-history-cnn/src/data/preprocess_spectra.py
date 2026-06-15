@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 import numpy as np
 import pandas as pd
@@ -35,8 +38,61 @@ def resolve_image_path(raise_dir: Path, rel_path: str) -> Path:
     raise FileNotFoundError(f"Image listed in split JSON is missing: {candidate}")
 
 
+def cache_filename_from_url(url: str, file_id: str | None = None) -> str:
+    suffix = Path(urlparse(url).path).suffix or ".img"
+    if file_id:
+        return f"{file_id}{suffix}"
+    name = Path(urlparse(url).path).name
+    return name if name else f"downloaded{suffix}"
+
+
+def download_url_to_cache(url: str, cache_dir: Path, file_id: str | None = None, timeout: int = 120) -> Path:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    target_path = cache_dir / cache_filename_from_url(url, file_id)
+    if target_path.exists() and target_path.stat().st_size > 0:
+        return target_path
+
+    tmp_path = target_path.with_suffix(target_path.suffix + ".tmp")
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urlopen(request, timeout=timeout) as response, tmp_path.open("wb") as f:
+        shutil.copyfileobj(response, f)
+    tmp_path.replace(target_path)
+    return target_path
+
+
+def resolve_source_entry(
+    source_entry: str | Dict[str, Any],
+    raise_dir: Path | None,
+    image_cache_dir: Path,
+) -> tuple[Path, Dict[str, Any]]:
+    if isinstance(source_entry, str):
+        if raise_dir is None:
+            raise ValueError("Split JSON contains local relative paths but no raise_dir is configured.")
+        source_path = resolve_image_path(raise_dir, source_entry)
+        return source_path, {
+            "source_file_id": source_path.stem,
+            "source_url": "",
+            "source_csv_index": "",
+            "download_cache_path": "",
+        }
+
+    url = str(source_entry.get("url", "")).strip()
+    file_id = str(source_entry.get("file_id", "")).strip() or None
+    if not url:
+        raise ValueError(f"URL split entry is missing 'url': {source_entry}")
+
+    source_path = download_url_to_cache(url, image_cache_dir, file_id=file_id)
+    return source_path, {
+        "source_file_id": file_id or source_path.stem,
+        "source_url": url,
+        "source_csv_index": source_entry.get("csv_index", ""),
+        "download_cache_path": str(source_path),
+    }
+
+
 def make_final_image(
     source_path: Path,
+    source_metadata: Dict[str, Any],
     class_name: str,
     final_size: int,
     jpeg_quality: int,
@@ -79,22 +135,32 @@ def make_final_image(
         "jpeg_quality": jpeg_value,
         "interpolation": interpolation_value,
     }
+    metadata.update(source_metadata)
     return final_img.convert("RGB"), metadata
 
 
 def sample_one_spectrum(
-    source_path: Path,
+    source_entry: str | Dict[str, Any],
     class_id: int,
     class_name: str,
     split: str,
     config: Dict[str, Any],
+    raise_dir: Path | None,
+    image_cache_dir: Path,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, Dict[str, Any]] | None:
     data_cfg = config["data"]
     prep_cfg = config["preprocessing"]
 
+    try:
+        source_path, source_metadata = resolve_source_entry(source_entry, raise_dir, image_cache_dir)
+    except Exception as exc:
+        print(f"Warning: failed to resolve source {source_entry}: {exc}")
+        return None
+
     result = make_final_image(
         source_path=source_path,
+        source_metadata=source_metadata,
         class_name=class_name,
         final_size=int(data_cfg["final_size"]),
         jpeg_quality=int(data_cfg["jpeg_quality"]),
@@ -127,9 +193,11 @@ def sample_one_spectrum(
 
 def build_split(
     split: str,
-    image_paths: list[Path],
+    sources: list[str | Dict[str, Any]],
     config: Dict[str, Any],
     processed_dir: Path,
+    raise_dir: Path | None,
+    image_cache_dir: Path,
     limit_samples: int | None,
 ) -> None:
     class_names = list(config["data"]["classes"])
@@ -166,8 +234,17 @@ def build_split(
                     f"Many images may be smaller than crop size {CLASS_CROP_SIZES[class_name]}."
                 )
             attempts += 1
-            source_path = image_paths[int(rng.integers(0, len(image_paths)))]
-            sample = sample_one_spectrum(source_path, class_id, class_name, split, config, rng)
+            source_entry = sources[int(rng.integers(0, len(sources)))]
+            sample = sample_one_spectrum(
+                source_entry,
+                class_id,
+                class_name,
+                split,
+                config,
+                raise_dir,
+                image_cache_dir,
+                rng,
+            )
             if sample is None:
                 continue
 
@@ -190,6 +267,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate final64 TV-rFFT spectrum cache.")
     parser.add_argument("--config", required=True)
     parser.add_argument("--raise-dir", default=None)
+    parser.add_argument("--image-cache-dir", default=None)
     parser.add_argument("--split-json", default=None)
     parser.add_argument("--processed-dir", default=None)
     parser.add_argument("--limit-samples", type=int, default=None, help="Cap samples per class for debug runs.")
@@ -197,20 +275,25 @@ def main() -> None:
 
     config = load_yaml(args.config)
     update_nested(config, "paths", "raise_dir", args.raise_dir)
+    update_nested(config, "paths", "image_cache_dir", args.image_cache_dir)
     update_nested(config, "paths", "split_json", args.split_json)
     update_nested(config, "paths", "processed_dir", args.processed_dir)
 
     split_json_path = Path(config["paths"]["split_json"])
     split_data = load_json(split_json_path)
 
-    configured_raise_dir = Path(config["paths"]["raise_dir"]).expanduser()
-    split_raise_dir = Path(split_data.get("input_dir", "")).expanduser()
-    raise_dir = configured_raise_dir if configured_raise_dir.exists() else split_raise_dir
-    if not raise_dir.exists():
-        raise FileNotFoundError(
-            f"RAISE directory does not exist. Tried config path '{configured_raise_dir}' "
-            f"and split JSON path '{split_raise_dir}'."
-        )
+    raise_dir = None
+    configured_raise_dir = config["paths"].get("raise_dir")
+    if configured_raise_dir:
+        candidate = Path(configured_raise_dir).expanduser()
+        if candidate.exists():
+            raise_dir = candidate
+    if raise_dir is None and split_data.get("input_dir"):
+        candidate = Path(split_data["input_dir"]).expanduser()
+        if candidate.exists():
+            raise_dir = candidate
+
+    image_cache_dir = ensure_dir(config["paths"].get("image_cache_dir", "data/raw/raise_tiff"))
 
     processed_dir = ensure_dir(config["paths"]["processed_dir"])
     save_json(config, processed_dir / "preprocess_config.json")
@@ -218,8 +301,8 @@ def main() -> None:
         json.dump(config["data"]["classes"], f, indent=2)
 
     for split in ("train", "val", "test"):
-        split_paths = [resolve_image_path(raise_dir, rel_path) for rel_path in split_data["splits"][split]]
-        build_split(split, split_paths, config, processed_dir, args.limit_samples)
+        sources = split_data["splits"][split]
+        build_split(split, sources, config, processed_dir, raise_dir, image_cache_dir, args.limit_samples)
 
 
 if __name__ == "__main__":
