@@ -5,4 +5,4 @@ export PYTHONPATH=.
 export CUDA_VISIBLE_DEVICES=0
 
 python src/train.py \
-  --config configs/v1_tv_rfft_mask.yaml
+  --config configs/v1_fourier_ambiguity_mask.yaml

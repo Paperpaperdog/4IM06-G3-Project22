@@ -1,0 +1,41 @@
+experiment_name: v1_fourier_ambiguity_mask
+data_dir: data/processed/v1_fourier_ambiguity
+output_dir: outputs/v1_fourier_ambiguity_mask
+
+num_classes: 4
+class_names:
+  - original
+  - JPEG_Q80
+  - downsample_x8
+  - downsample_x16
+
+observed_sizes:
+  - 128
+  - 96
+  - 64
+  - 48
+  - 32
+
+spectrum:
+  channels: 1
+  height: 512
+  width_rfft: 257
+
+model:
+  type: spectral_mask_classifier
+  init_mask_logits: 0.0
+  init_reference_std: 0.02
+  lambda_mask_l1: 0.0
+
+training:
+  device: cuda
+  batch_size: 64
+  epochs: 30
+  optimizer: AdamW
+  lr: 0.001
+  weight_decay: 0.0001
+  scheduler: cosine
+  seed: 123
+  num_workers: 4
+  pin_memory: true
+  save_best_by: val_loss

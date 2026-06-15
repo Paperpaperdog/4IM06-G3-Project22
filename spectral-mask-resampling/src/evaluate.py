@@ -64,6 +64,19 @@ def main() -> None:
     probs = np.concatenate(all_probs)
     y_pred = probs.argmax(axis=1)
     metrics = compute_metrics(y_true, y_pred, probs, config["class_names"])
+    observed_sizes_path = Path(config["data_dir"]) / f"{args.split}_observed_sizes.npy"
+    observed_sizes = np.load(observed_sizes_path, mmap_mode="r")
+    metrics["accuracy_by_observed_size"] = {}
+    by_size_dir = ensure_dir(figures_dir / "confusion_matrix_by_observed_size")
+    for observed_size in config["observed_sizes"]:
+        mask = np.asarray(observed_sizes) == observed_size
+        size_metrics = compute_metrics(y_true[mask], y_pred[mask], probs[mask], config["class_names"])
+        metrics["accuracy_by_observed_size"][str(observed_size)] = size_metrics["accuracy"]
+        save_confusion_matrix(
+            np.asarray(size_metrics["confusion_matrix"]),
+            config["class_names"],
+            by_size_dir / f"confusion_matrix_observed_size_{observed_size}.png",
+        )
     save_json(metrics, output_dir / "metrics.json")
     save_confusion_matrix(np.asarray(metrics["confusion_matrix"]), config["class_names"], figures_dir / "confusion_matrix.png")
 
@@ -71,6 +84,7 @@ def main() -> None:
         "index": np.arange(len(y_true)),
         "true_label": y_true,
         "pred_label": y_pred,
+        "observed_size": np.asarray(observed_sizes),
     }
     for idx, name in enumerate(config["class_names"]):
         rows[f"prob_{name}"] = probs[:, idx]
