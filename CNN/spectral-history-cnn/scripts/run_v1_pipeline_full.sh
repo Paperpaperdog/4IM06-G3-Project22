@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-export PYTHONPATH=.
 
 CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
 RAISE_DIR="${RAISE_DIR:-../../spectral-mask-resampling/data/raw/raise_tiff}"
@@ -47,8 +46,10 @@ else
   log "SKIP_PREPARE=1, using existing processed data"
 fi
 
+# Do not pipe `source` — pipeline subshell drops PYTHONPATH from ensure_npu_deps.
 # shellcheck disable=SC1091
-source "$ROOT/scripts/activate_python.sh" | tee -a "$LOG_FILE"
+source "$ROOT/scripts/activate_python.sh" >> "$LOG_FILE" 2>&1
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}."
 
 python - <<'PY' | tee -a "$LOG_FILE"
 from src.utils.device import print_device_info
