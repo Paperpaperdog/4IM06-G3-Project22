@@ -12,6 +12,15 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 
 **实验总结（DL）**：[`EXPERIMENT_SUMMARY.md`](EXPERIMENT_SUMMARY.md) · **W3 先导报告**：[`REPORT.zh.md`](REPORT.zh.md) · **周会**：[`SUIVI.md`](SUIVI.md)
 
+**详细方法文档**（流程图 + 数据处理 + 我们的实验）：
+
+| 文档 | 内容 |
+|------|------|
+| [`docs/00_project_overview.md`](docs/00_project_overview.md) | 原项目、复现时间线、主要发现汇总 |
+| [`docs/01_classical_detection.md`](docs/01_classical_detection.md) | 经典检测（pilots / NFA / JPEG×8） |
+| [`docs/02_spectral_mask.md`](docs/02_spectral_mask.md) | Mask 路线全流程 |
+| [`docs/03_spectral_cnn.md`](docs/03_spectral_cnn.md) | CNN 路线全流程 |
+
 ---
 
 ## 我该用哪个脚本？
