@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -12,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset import SpectraDataset
 from src.models.spectral_positional_cnn import SpectralPositionalCNN
+from src.utils.device import get_device, setup_device_env, use_pin_memory
 from src.utils.io import ensure_dir, load_yaml, save_json, update_nested
 from src.utils.metrics import compute_classification_metrics
 from src.utils.plots import save_confusion_matrix
@@ -32,13 +32,6 @@ def build_model(config: Dict[str, Any]) -> SpectralPositionalCNN:
         axis_sigma=float(config["positional_encoding"]["axis_sigma"]),
         dropout=float(config["model"]["dropout"]),
     )
-
-
-def get_device(config: Dict[str, Any]) -> torch.device:
-    requested = str(config["training"]["device"])
-    if requested == "cuda" and torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
 
 
 @torch.no_grad()
@@ -69,10 +62,9 @@ def main() -> None:
 
     config = load_yaml(args.config)
     apply_cli_overrides(config, args)
-    cuda_visible = config["training"].get("cuda_visible_devices")
-    if cuda_visible is not None:
-        os.environ.setdefault("CUDA_VISIBLE_DEVICES", str(cuda_visible))
+    setup_device_env(config)
     device = get_device(config)
+    print(f"Using device: {device}")
 
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     model_config = checkpoint.get("config", config)
@@ -88,7 +80,7 @@ def main() -> None:
         batch_size=int(config["training"]["batch_size"]),
         shuffle=False,
         num_workers=int(config["training"]["num_workers"]),
-        pin_memory=(device.type == "cuda" and bool(config["training"].get("pin_memory", True))),
+        pin_memory=use_pin_memory(device, config),
     )
 
     indices, y_true, probs = predict(model, loader, device)

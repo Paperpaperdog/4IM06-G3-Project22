@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -11,6 +10,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset import SpectraDataset
 from src.models.spectral_positional_cnn import SpectralPositionalCNN
+from src.utils.device import get_device, setup_device_env
 from src.utils.io import ensure_dir, load_yaml, update_nested
 from src.utils.plots import save_many_spectra_grid, save_spectrum_image
 
@@ -30,13 +30,6 @@ def build_model(config: Dict[str, Any]) -> SpectralPositionalCNN:
         axis_sigma=float(config["positional_encoding"]["axis_sigma"]),
         dropout=float(config["model"]["dropout"]),
     )
-
-
-def get_device(config: Dict[str, Any]) -> torch.device:
-    requested = str(config["training"]["device"])
-    if requested == "cuda" and torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
 
 
 def save_mean_and_example_spectra(
@@ -134,10 +127,9 @@ def main() -> None:
 
     config = load_yaml(args.config)
     apply_cli_overrides(config, args)
-    cuda_visible = config["training"].get("cuda_visible_devices")
-    if cuda_visible is not None:
-        os.environ.setdefault("CUDA_VISIBLE_DEVICES", str(cuda_visible))
+    setup_device_env(config)
     device = get_device(config)
+    print(f"Using device: {device}")
 
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     model_config = checkpoint.get("config", config)

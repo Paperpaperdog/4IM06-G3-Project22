@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 from pathlib import Path
 from typing import Any, Dict
 
 import torch
 from torch import nn
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 
 from src.data.dataset import SpectraDataset
 from src.models.spectral_positional_cnn import SpectralPositionalCNN
+from src.utils.device import (
+    autocast_context,
+    create_grad_scaler,
+    get_device,
+    setup_device_env,
+    supports_amp,
+    use_pin_memory,
+)
 from src.utils.io import ensure_dir, load_yaml, update_nested
 from src.utils.plots import save_train_curves
 from src.utils.seed import set_seed
@@ -44,22 +50,13 @@ def build_model(config: Dict[str, Any]) -> SpectralPositionalCNN:
     return model
 
 
-def get_device(config: Dict[str, Any]) -> torch.device:
-    requested = str(config["training"]["device"])
-    if requested == "cuda" and torch.cuda.is_available():
-        return torch.device("cuda")
-    if requested == "cuda" and not torch.cuda.is_available():
-        print("CUDA requested but unavailable. Falling back to CPU.")
-    return torch.device("cpu")
-
-
 def run_epoch(
     model: nn.Module,
     loader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
     optimizer: torch.optim.Optimizer | None = None,
-    scaler: GradScaler | None = None,
+    scaler: Any | None = None,
     use_amp: bool = False,
 ) -> tuple[float, float]:
     is_train = optimizer is not None
@@ -76,15 +73,19 @@ def run_epoch(
             optimizer.zero_grad(set_to_none=True)
 
         with torch.set_grad_enabled(is_train):
-            with autocast(enabled=use_amp and device.type == "cuda"):
+            with autocast_context(device, use_amp):
                 logits = model(x)
                 loss = criterion(logits, y)
 
             if is_train:
-                assert scaler is not None
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
+                assert optimizer is not None
+                if scaler is not None:
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    optimizer.step()
 
         batch_size = int(y.shape[0])
         total_loss += float(loss.detach().cpu()) * batch_size
@@ -127,14 +128,13 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--resume", default=None, help="Resume from checkpoint path (e.g. checkpoints/last.pt).")
     args = parser.parse_args()
 
     config = load_yaml(args.config)
     apply_cli_overrides(config, args)
 
-    cuda_visible = config["training"].get("cuda_visible_devices")
-    if cuda_visible is not None:
-        os.environ.setdefault("CUDA_VISIBLE_DEVICES", str(cuda_visible))
+    setup_device_env(config)
 
     seed = int(config["training"].get("seed", config["data"]["seed"]))
     set_seed(seed)
@@ -150,7 +150,7 @@ def main() -> None:
     val_dataset = SpectraDataset(processed_dir, "val")
     batch_size = int(config["training"]["batch_size"])
     num_workers = int(config["training"]["num_workers"])
-    pin_memory = bool(config["training"].get("pin_memory", True)) and device.type == "cuda"
+    pin_memory = use_pin_memory(device, config)
 
     train_loader = DataLoader(
         train_dataset,
@@ -180,19 +180,34 @@ def main() -> None:
     scheduler = None
     if str(config["training"].get("scheduler", "cosine")).lower() == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(config["training"]["epochs"]))
-    scaler = GradScaler(enabled=bool(config["training"]["amp"]) and device.type == "cuda")
+    use_amp = supports_amp(device, config)
+    scaler = create_grad_scaler(device, use_amp)
 
     log_path = output_dir / "train_log.csv"
-    with log_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["epoch", "lr", "train_loss", "train_acc", "val_loss", "val_acc"])
-        writer.writeheader()
-
+    start_epoch = 1
     best_metric = float("inf")
     best_val_loss = float("inf")
+    if args.resume:
+        resume_path = Path(args.resume)
+        checkpoint = torch.load(resume_path, map_location="cpu", weights_only=False)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = int(checkpoint.get("epoch", 0)) + 1
+        best_val_loss = float(checkpoint.get("best_val_loss", float("inf")))
+        print(f"Resumed from {resume_path} at epoch {start_epoch}")
+        log_mode = "a" if log_path.exists() else "w"
+    else:
+        log_mode = "w"
+
+    with log_path.open(log_mode, newline="", encoding="utf-8") as f:
+        if log_mode == "w":
+            writer = csv.DictWriter(f, fieldnames=["epoch", "lr", "train_loss", "train_acc", "val_loss", "val_acc"])
+            writer.writeheader()
+
     epochs = int(config["training"]["epochs"])
     save_best_by = str(config["training"].get("save_best_by", "val_loss"))
 
-    for epoch in range(1, epochs + 1):
+    for epoch in range(start_epoch, epochs + 1):
         train_loss, train_acc = run_epoch(
             model,
             train_loader,
@@ -200,7 +215,7 @@ def main() -> None:
             device,
             optimizer=optimizer,
             scaler=scaler,
-            use_amp=bool(config["training"]["amp"]),
+            use_amp=use_amp,
         )
         val_loss, val_acc = run_epoch(model, val_loader, criterion, device)
         if scheduler is not None:

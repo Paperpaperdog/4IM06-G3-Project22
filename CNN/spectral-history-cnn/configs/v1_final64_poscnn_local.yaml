@@ -57,8 +57,8 @@ model:
   dropout: 0.2
 
 training:
-  device: cuda
-  cuda_visible_devices: "0"
+  device: npu
+  npu_visible_devices: "0"
   batch_size: 256
   epochs: 50
   optimizer: AdamW
