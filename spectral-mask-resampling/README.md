@@ -195,7 +195,7 @@ python src/data/preprocess_spectra.py \
   --dtype float16
 ```
 
-For the debug cache, change `data_dir` in `configs/v1_fourier_ambiguity_mask.yaml` to `data/processed/debug_v1_fourier_ambiguity` and reduce epochs if needed.
+For the debug cache, change `data_dir` in `configs/v1_fourier_ambiguity_mask_clean.yaml` to `data/processed/debug_v1_fourier_ambiguity` and reduce epochs if needed.
 
 ## Train
 
@@ -213,15 +213,15 @@ export PYTHONPATH=.
 export CUDA_VISIBLE_DEVICES=0
 
 python src/train.py \
-  --config configs/v1_fourier_ambiguity_mask.yaml
+  --config configs/v1_fourier_ambiguity_mask_clean.yaml
 ```
 
 Expected config:
 
 ```yaml
-experiment_name: v1_fourier_ambiguity_mask
+experiment_name: v1_fourier_ambiguity_mask_clean
 data_dir: data/processed/v1_fourier_ambiguity
-output_dir: outputs/v1_fourier_ambiguity_mask
+output_dir: outputs/v1_fourier_ambiguity_mask_clean
 
 num_classes: 4
 class_names:
@@ -278,16 +278,16 @@ export PYTHONPATH=.
 export CUDA_VISIBLE_DEVICES=0
 
 python src/evaluate.py \
-  --config configs/v1_fourier_ambiguity_mask.yaml \
-  --checkpoint outputs/v1_fourier_ambiguity_mask/checkpoints/best.pt \
+  --config configs/v1_fourier_ambiguity_mask_clean.yaml \
+  --checkpoint outputs/v1_fourier_ambiguity_mask_clean/checkpoints/best.pt \
   --split test
 
 python src/visualize.py \
-  --config configs/v1_fourier_ambiguity_mask.yaml \
-  --checkpoint outputs/v1_fourier_ambiguity_mask/checkpoints/best.pt
+  --config configs/v1_fourier_ambiguity_mask_clean.yaml \
+  --checkpoint outputs/v1_fourier_ambiguity_mask_clean/checkpoints/best.pt
 ```
 
-Outputs are written to `outputs/v1_fourier_ambiguity_mask/`.
+Outputs are written to `outputs/v1_fourier_ambiguity_mask_clean/`.
 
 ## Outputs
 

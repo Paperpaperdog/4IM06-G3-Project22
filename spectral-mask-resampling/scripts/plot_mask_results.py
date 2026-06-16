@@ -206,7 +206,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean"),
+        default=Path("outputs/v1_fourier_ambiguity_mask_clean"),
     )
     args = parser.parse_args()
 

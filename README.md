@@ -109,7 +109,7 @@ python evaluate_detector_on_dataset.py \
 针对 **Fourier ambiguity**：不同原始尺寸经不同路径可能落到同一观测尺寸，频谱峰值位置相似。
 
 - **代码**：`spectral-mask-resampling/src/`（训练、评估、可视化）
-- **配置**：`spectral-mask-resampling/configs/v1_fourier_ambiguity_mask.yaml`
+- **配置**：`spectral-mask-resampling/configs/v1_fourier_ambiguity_mask_clean.yaml`
 - **最佳结果**：`outputs/v1_fourier_ambiguity_mask_clean/`（测试准确率 **56.6%**，macro F1 **0.561**）
 - **汇总图**：`outputs/v1_fourier_ambiguity_mask_clean/figures/summary/`
 

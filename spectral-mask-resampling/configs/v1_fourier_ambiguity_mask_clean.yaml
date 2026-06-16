@@ -1,6 +1,6 @@
-experiment_name: v1_fourier_ambiguity_mask
+experiment_name: v1_fourier_ambiguity_mask_clean
 data_dir: data/processed/v1_fourier_ambiguity
-output_dir: outputs/v1_fourier_ambiguity_mask
+output_dir: outputs/v1_fourier_ambiguity_mask_clean
 
 num_classes: 4
 class_names:

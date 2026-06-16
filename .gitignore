@@ -50,9 +50,13 @@ test_results/**/*.tif
 test_results/**/*.tiff
 test_results/**/detection_summary_limit*.csv
 
-# Spectral mask: track source + clean-run summaries, ignore generated data
+# Spectral mask: track source + clean-run summaries only
 spectral-mask-resampling/data/
 spectral-mask-resampling/outputs/
+spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask/
+spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_fast/
+spectral-mask-resampling/outputs/debug_v1/
+spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_heldout_size/
 spectral-mask-resampling/.venv/
 spectral-mask-resampling/.matplotlib-cache/
 spectral-mask-resampling/.DS_Store
