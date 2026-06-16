@@ -1,0 +1,113 @@
+{
+  "accuracy": 0.6245555555555555,
+  "per_class": {
+    "original": {
+      "precision": 0.900516795865633,
+      "recall": 0.9293333333333333,
+      "f1": 0.9146981627296588,
+      "support": 1500
+    },
+    "JPEG": {
+      "precision": 0.9207443142660234,
+      "recall": 0.8906666666666667,
+      "f1": 0.9054557777024738,
+      "support": 1500
+    },
+    "downsample_x2": {
+      "precision": 0.6813441483198146,
+      "recall": 0.784,
+      "f1": 0.7290762554246745,
+      "support": 1500
+    },
+    "downsample_x4": {
+      "precision": 0.4397824397824398,
+      "recall": 0.37733333333333335,
+      "f1": 0.4061715105848583,
+      "support": 1500
+    },
+    "downsample_x8": {
+      "precision": 0.3242924528301887,
+      "recall": 0.18333333333333332,
+      "f1": 0.2342419080068143,
+      "support": 1500
+    },
+    "downsample_x16": {
+      "precision": 0.40841121495327104,
+      "recall": 0.5826666666666667,
+      "f1": 0.48021978021978023,
+      "support": 1500
+    }
+  },
+  "confusion_matrix": [
+    [
+      1394,
+      41,
+      11,
+      16,
+      5,
+      33
+    ],
+    [
+      65,
+      1336,
+      37,
+      28,
+      15,
+      19
+    ],
+    [
+      15,
+      38,
+      1176,
+      122,
+      50,
+      99
+    ],
+    [
+      32,
+      17,
+      248,
+      566,
+      202,
+      435
+    ],
+    [
+      21,
+      11,
+      162,
+      351,
+      275,
+      680
+    ],
+    [
+      21,
+      8,
+      92,
+      204,
+      301,
+      874
+    ]
+  ],
+  "one_vs_rest_auc": {
+    "original": 0.9910833777777776,
+    "JPEG": 0.9929860444444445,
+    "downsample_x2": 0.9451675555555556,
+    "downsample_x4": 0.7662398222222222,
+    "downsample_x8": 0.7398411111111112,
+    "downsample_x16": 0.8280067555555556
+  },
+  "important_confusion_pairs": {
+    "JPEG_as_downsample_x8": 15,
+    "downsample_x8_as_JPEG": 11,
+    "JPEG_as_downsample_x16": 19,
+    "downsample_x16_as_JPEG": 8,
+    "downsample_x4_as_downsample_x8": 202,
+    "downsample_x8_as_downsample_x4": 351,
+    "downsample_x8_as_downsample_x16": 680,
+    "downsample_x16_as_downsample_x8": 301,
+    "original_as_JPEG": 41,
+    "JPEG_as_original": 65,
+    "original_as_downsample_x2": 11,
+    "downsample_x2_as_original": 15
+  }
+}

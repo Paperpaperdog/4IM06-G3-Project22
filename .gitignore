@@ -12,6 +12,18 @@ logs/
 checkpoints/
 runs/
 
+# Keep lightweight experiment summaries under this path tracked.
+!CNN/
+!CNN/spectral-history-cnn/
+!CNN/spectral-history-cnn/outputs/
+!CNN/spectral-history-cnn/outputs/*.json
+!CNN/spectral-history-cnn/outputs/*.csv
+!CNN/spectral-history-cnn/outputs/figures/
+!CNN/spectral-history-cnn/outputs/figures/*.png
+!CNN/spectral-history-cnn/outputs/figures/*.jpg
+!CNN/spectral-history-cnn/outputs/figures/*.jpeg
+!CNN/spectral-history-cnn/outputs/figures/*.pdf
+
 # ML large files
 *.npy
 *.npz
