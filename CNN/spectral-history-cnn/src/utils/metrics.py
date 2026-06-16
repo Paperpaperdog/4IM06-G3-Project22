@@ -79,10 +79,10 @@ def compute_classification_metrics(
     confusion_pairs = [
         ("JPEG", "downsample_x8"),
         ("JPEG", "downsample_x16"),
-        ("downsample_x4", "downsample_x8"),
         ("downsample_x8", "downsample_x16"),
         ("original", "JPEG"),
-        ("original", "downsample_x2"),
+        ("original", "downsample_x8"),
+        ("original", "downsample_x16"),
     ]
     pair_counts = {}
     cm = np.asarray(out["confusion_matrix"])
