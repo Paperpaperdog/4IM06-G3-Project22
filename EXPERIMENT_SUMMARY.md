@@ -1,7 +1,8 @@
 # 实验梳理与结果分析
 
 > 更新日期：2026-06-16  
-> 涵盖两条主线：**Mask**（`spectral-mask-resampling`）与 **CNN**（`spectral-history-cnn`）
+> 涵盖三条主线：**经典 NFA**（根目录 + `test`）、**Mask**（`spectral-mask-resampling`）、**CNN**（`spectral-history-cnn`）  
+> 总览见 [`README.md`](README.md)
 
 ---
 

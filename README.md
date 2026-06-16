@@ -61,8 +61,7 @@ python detect_resampling.py --image path/to/image.png --outdir outputs
 | `evaluate_detector_on_dataset.py` | 数据集上评估检测器 |
 | `img/` | 演示用测试图（baboon、pashmina 等） |
 
-详细用法：[`README_spai_detector.md`](README_spai_detector.md)  
-`ResamplingDetector.py` 自带 README 说明（原 `test` 分支 `README.md`）。
+详细用法：[`README_spai_detector.md`](README_spai_detector.md)、[`README_ResamplingDetector.md`](README_ResamplingDetector.md)
 
 ---
 
