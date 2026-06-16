@@ -16,6 +16,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 
 | 文档 | 内容 |
 |------|------|
+| [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) | **总体实验报告**（摘要、三路线、对比、结论） |
 | [`docs/00_project_overview.md`](docs/00_project_overview.md) | 原项目、复现时间线、主要发现汇总 |
 | [`docs/01_classical_detection.md`](docs/01_classical_detection.md) | 经典检测（pilots / NFA / JPEG×8） |
 | [`docs/02_spectral_mask.md`](docs/02_spectral_mask.md) | Mask 路线全流程 |

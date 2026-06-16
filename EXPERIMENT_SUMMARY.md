@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-16  
 > 涵盖三条主线：**经典检测**（zzy NFA + test JPEG/×8）、**Mask**（`spectral-mask-resampling`）、**CNN**（`spectral-history-cnn`）  
-> 总览见 [`README.md`](README.md) · 详细文档见 [`docs/00_project_overview.md`](docs/00_project_overview.md)
+> 总览见 [`README.md`](README.md) · **总体报告** [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) · 详细文档 [`docs/00_project_overview.md`](docs/00_project_overview.md)
 
 ---
 
