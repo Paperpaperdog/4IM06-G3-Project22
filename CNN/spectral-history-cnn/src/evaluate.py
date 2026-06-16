@@ -108,7 +108,9 @@ def main() -> None:
 
     wanted_meta_cols = ["source_filename", "crop_size", "crop_x", "crop_y", "jpeg_quality", "interpolation"]
     if dataset.metadata is not None:
-        meta = dataset.metadata.iloc[indices].reset_index(drop=True)
+        # SpectraDataset keeps metadata as a list[dict]; normalize to DataFrame for indexed join.
+        meta_df = pd.DataFrame(dataset.metadata)
+        meta = meta_df.iloc[indices].reset_index(drop=True)
         for col in wanted_meta_cols:
             pred_df[col] = meta[col].values if col in meta.columns else ""
     else:
