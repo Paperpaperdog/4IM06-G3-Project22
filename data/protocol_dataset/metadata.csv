@@ -1,3 +1,0 @@
-sample_id,source_image,source_square_size,peak_size,reference_size,target_size,interpolation,output_image
-0,data\images_png\r000da54ft.png,2848,64,320,384,bicubic,data\protocol_dataset\samples\00000000_r000da54ft_p64_r320_t384.png
-1,data\images_png\r001d260dt.png,3264,64,320,384,bicubic,data\protocol_dataset\samples\00000001_r001d260dt_p64_r320_t384.png
