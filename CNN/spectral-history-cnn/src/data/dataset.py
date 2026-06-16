@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
@@ -17,10 +17,11 @@ class SpectraDataset(Dataset):
         self.labels = np.load(self.processed_dir / f"{split}_labels.npy")
         if len(self.spectra) != len(self.labels):
             raise ValueError(f"Spectra/label length mismatch for split '{split}'.")
-        self.metadata: Optional[pd.DataFrame] = None
+        self.metadata: Optional[List[Dict[str, Any]]] = None
         metadata_path = self.processed_dir / f"{split}_metadata.csv"
         if load_metadata and metadata_path.exists():
-            self.metadata = pd.read_csv(metadata_path)
+            with metadata_path.open(newline="", encoding="utf-8") as f:
+                self.metadata = list(csv.DictReader(f))
 
     def __len__(self) -> int:
         return int(len(self.labels))

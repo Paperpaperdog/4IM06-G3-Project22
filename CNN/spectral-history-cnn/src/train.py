@@ -20,8 +20,12 @@ from src.utils.device import (
     use_pin_memory,
 )
 from src.utils.io import ensure_dir, load_yaml, update_nested
-from src.utils.plots import save_train_curves
 from src.utils.seed import set_seed
+
+try:
+    from src.utils.plots import save_train_curves
+except ImportError:  # optional on NPU nodes without matplotlib
+    save_train_curves = None
 
 
 def apply_cli_overrides(config: Dict[str, Any], args: argparse.Namespace) -> None:
@@ -247,7 +251,8 @@ def main() -> None:
             save_checkpoint(checkpoint_dir / "best.pt", model, optimizer, epoch, config, best_val_loss)
 
         save_checkpoint(checkpoint_dir / "last.pt", model, optimizer, epoch, config, best_val_loss)
-        save_train_curves(log_path, figures_dir / "train_curves.png")
+        if save_train_curves is not None:
+            save_train_curves(log_path, figures_dir / "train_curves.png")
 
 
 if __name__ == "__main__":

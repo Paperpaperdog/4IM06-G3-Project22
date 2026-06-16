@@ -41,18 +41,20 @@ status "train"
   2>&1 | tee -a "$LOG_FILE"
 
 status "eval"
-"$PY" src/evaluate.py \
+if "$PY" src/evaluate.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
   --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
-  --split test 2>&1 | tee -a "$LOG_FILE"
-
-status "visualize"
-"$PY" src/visualize.py \
-  --config "$CONFIG" \
-  --device "$DEVICE" \
-  --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
-  --split test 2>&1 | tee -a "$LOG_FILE"
+  --split test 2>&1 | tee -a "$LOG_FILE"; then
+  status "visualize"
+  "$PY" src/visualize.py \
+    --config "$CONFIG" \
+    --device "$DEVICE" \
+    --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+    --split test 2>&1 | tee -a "$LOG_FILE"
+else
+  log "WARN: eval/visualize skipped (optional deps missing on NPU image)"
+fi
 
 status "DONE"
 log "=== CNN NPU train-only finished ==="
