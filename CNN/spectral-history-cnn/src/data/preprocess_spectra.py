@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlparse
@@ -29,6 +30,8 @@ CLASS_CROP_SIZES = {
     "downsample_x8": 512,
     "downsample_x16": 1024,
 }
+
+SPLIT_SEED_OFFSETS = {"train": 0, "val": 100_000, "test": 200_000}
 
 
 def resolve_image_path(raise_dir: Path, rel_path: str) -> Path:
@@ -191,6 +194,93 @@ def sample_one_spectrum(
     return spectrum, metadata
 
 
+def build_class_samples(
+    split: str,
+    class_id: int,
+    class_name: str,
+    sources: list[str | Dict[str, Any]],
+    config: Dict[str, Any],
+    raise_dir: Path | None,
+    image_cache_dir: Path,
+    limit_samples: int | None,
+    show_progress: bool = True,
+) -> tuple[np.ndarray, np.ndarray, list[Dict[str, Any]]]:
+    if class_name not in CLASS_CROP_SIZES:
+        raise ValueError(f"Unknown class '{class_name}'.")
+
+    data_cfg = config["data"]
+    final_size = int(data_cfg["final_size"])
+    width_rfft = final_size // 2 + 1
+    target_key = f"{split}_samples_per_class"
+    target_per_class = int(data_cfg[target_key])
+    if limit_samples is not None:
+        target_per_class = min(target_per_class, int(limit_samples))
+
+    spectra = np.empty((target_per_class, 1, final_size, width_rfft), dtype=np.float16)
+    labels = np.full((target_per_class,), class_id, dtype=np.int64)
+    metadata_rows: list[Dict[str, Any]] = []
+
+    base_seed = int(config["data"]["seed"]) + SPLIT_SEED_OFFSETS[split]
+    rng = np.random.default_rng(base_seed + class_id * 1009)
+    progress = tqdm(
+        total=target_per_class,
+        desc=f"{split}:{class_name}",
+        unit="sample",
+        disable=not show_progress,
+    )
+    made = 0
+    attempts = 0
+    max_attempts = max(target_per_class * 500, 5000)
+
+    while made < target_per_class:
+        if attempts >= max_attempts:
+            raise RuntimeError(
+                f"Could only generate {made}/{target_per_class} samples for {split}:{class_name}. "
+                f"Many images may be smaller than crop size {CLASS_CROP_SIZES[class_name]}."
+            )
+        attempts += 1
+        source_entry = sources[int(rng.integers(0, len(sources)))]
+        sample = sample_one_spectrum(
+            source_entry,
+            class_id,
+            class_name,
+            split,
+            config,
+            raise_dir,
+            image_cache_dir,
+            rng,
+        )
+        if sample is None:
+            continue
+
+        spectrum, metadata = sample
+        spectra[made] = spectrum.astype(np.float16)
+        metadata_rows.append(metadata)
+        made += 1
+        progress.update(1)
+    progress.close()
+    return spectra, labels, metadata_rows
+
+
+def _build_class_samples_worker(
+    task: Dict[str, Any],
+) -> tuple[str, int, np.ndarray, np.ndarray, list[Dict[str, Any]]]:
+    raise_dir = Path(task["raise_dir"]) if task["raise_dir"] else None
+    image_cache_dir = Path(task["image_cache_dir"])
+    spectra, labels, metadata_rows = build_class_samples(
+        split=task["split"],
+        class_id=int(task["class_id"]),
+        class_name=str(task["class_name"]),
+        sources=task["sources"],
+        config=task["config"],
+        raise_dir=raise_dir,
+        image_cache_dir=image_cache_dir,
+        limit_samples=task["limit_samples"],
+        show_progress=False,
+    )
+    return str(task["split"]), int(task["class_id"]), spectra, labels, metadata_rows
+
+
 def build_split(
     split: str,
     sources: list[str | Dict[str, Any]],
@@ -199,6 +289,7 @@ def build_split(
     raise_dir: Path | None,
     image_cache_dir: Path,
     limit_samples: int | None,
+    workers: int = 1,
 ) -> None:
     class_names = list(config["data"]["classes"])
     final_size = int(config["data"]["final_size"])
@@ -213,54 +304,110 @@ def build_split(
     labels = np.empty((total_samples,), dtype=np.int64)
     metadata_rows: list[Dict[str, Any]] = []
 
-    split_seed_offsets = {"train": 0, "val": 100_000, "test": 200_000}
-    base_seed = int(config["data"]["seed"]) + split_seed_offsets[split]
-    out_idx = 0
-
-    for class_id, class_name in enumerate(class_names):
-        if class_name not in CLASS_CROP_SIZES:
-            raise ValueError(f"Unknown class '{class_name}'.")
-
-        rng = np.random.default_rng(base_seed + class_id * 1009)
-        progress = tqdm(total=target_per_class, desc=f"{split}:{class_name}", unit="sample")
-        made = 0
-        attempts = 0
-        max_attempts = max(target_per_class * 500, 5000)
-
-        while made < target_per_class:
-            if attempts >= max_attempts:
-                raise RuntimeError(
-                    f"Could only generate {made}/{target_per_class} samples for {split}:{class_name}. "
-                    f"Many images may be smaller than crop size {CLASS_CROP_SIZES[class_name]}."
-                )
-            attempts += 1
-            source_entry = sources[int(rng.integers(0, len(sources)))]
-            sample = sample_one_spectrum(
-                source_entry,
+    if workers <= 1:
+        out_idx = 0
+        for class_id, class_name in enumerate(class_names):
+            class_spectra, class_labels, class_metadata = build_class_samples(
+                split,
                 class_id,
                 class_name,
-                split,
+                sources,
                 config,
                 raise_dir,
                 image_cache_dir,
-                rng,
+                limit_samples,
+                show_progress=True,
             )
-            if sample is None:
-                continue
+            end_idx = out_idx + len(class_labels)
+            spectra[out_idx:end_idx] = class_spectra
+            labels[out_idx:end_idx] = class_labels
+            metadata_rows.extend(class_metadata)
+            out_idx = end_idx
+    else:
+        tasks = [
+            {
+                "split": split,
+                "class_id": class_id,
+                "class_name": class_name,
+                "sources": sources,
+                "config": config,
+                "raise_dir": str(raise_dir) if raise_dir is not None else None,
+                "image_cache_dir": str(image_cache_dir),
+                "limit_samples": limit_samples,
+            }
+            for class_id, class_name in enumerate(class_names)
+        ]
+        class_results: dict[int, tuple[np.ndarray, np.ndarray, list[Dict[str, Any]]]] = {}
+        with ProcessPoolExecutor(max_workers=min(workers, len(tasks))) as executor:
+            futures = [executor.submit(_build_class_samples_worker, task) for task in tasks]
+            for future in tqdm(as_completed(futures), total=len(futures), desc=f"{split}:classes", unit="class"):
+                _, class_id, class_spectra, class_labels, class_metadata = future.result()
+                class_results[class_id] = (class_spectra, class_labels, class_metadata)
 
-            spectrum, metadata = sample
-            spectra[out_idx] = spectrum.astype(np.float16)
-            labels[out_idx] = class_id
-            metadata_rows.append(metadata)
-            out_idx += 1
-            made += 1
-            progress.update(1)
-        progress.close()
+        out_idx = 0
+        for class_id in range(len(class_names)):
+            class_spectra, class_labels, class_metadata = class_results[class_id]
+            end_idx = out_idx + len(class_labels)
+            spectra[out_idx:end_idx] = class_spectra
+            labels[out_idx:end_idx] = class_labels
+            metadata_rows.extend(class_metadata)
+            out_idx = end_idx
 
     np.save(processed_dir / f"{split}_spectra.npy", spectra)
     np.save(processed_dir / f"{split}_labels.npy", labels)
     pd.DataFrame(metadata_rows).to_csv(processed_dir / f"{split}_metadata.csv", index=False)
     print(f"Saved {split}: spectra={spectra.shape}, labels={labels.shape}")
+
+
+def build_all_splits_parallel(
+    split_data: Dict[str, Any],
+    config: Dict[str, Any],
+    processed_dir: Path,
+    raise_dir: Path | None,
+    image_cache_dir: Path,
+    limit_samples: int | None,
+    workers: int,
+) -> None:
+    class_names = list(config["data"]["classes"])
+    tasks = []
+    for split in ("train", "val", "test"):
+        sources = split_data["splits"][split]
+        for class_id, class_name in enumerate(class_names):
+            tasks.append(
+                {
+                    "split": split,
+                    "class_id": class_id,
+                    "class_name": class_name,
+                    "sources": sources,
+                    "config": config,
+                    "raise_dir": str(raise_dir) if raise_dir is not None else None,
+                    "image_cache_dir": str(image_cache_dir),
+                    "limit_samples": limit_samples,
+                }
+            )
+
+    split_class_results: dict[str, dict[int, tuple[np.ndarray, np.ndarray, list[Dict[str, Any]]]]] = {
+        split: {} for split in ("train", "val", "test")
+    }
+    with ProcessPoolExecutor(max_workers=min(workers, len(tasks))) as executor:
+        futures = [executor.submit(_build_class_samples_worker, task) for task in tasks]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="preprocess", unit="task"):
+            split_name, class_id, class_spectra, class_labels, class_metadata = future.result()
+            split_class_results[split_name][class_id] = (class_spectra, class_labels, class_metadata)
+
+    for split in ("train", "val", "test"):
+        class_results = split_class_results[split]
+        chunks = [class_results[class_id] for class_id in range(len(class_names))]
+        spectra = np.concatenate([item[0] for item in chunks], axis=0)
+        labels = np.concatenate([item[1] for item in chunks], axis=0)
+        metadata_rows: list[Dict[str, Any]] = []
+        for _, _, class_metadata in chunks:
+            metadata_rows.extend(class_metadata)
+
+        np.save(processed_dir / f"{split}_spectra.npy", spectra)
+        np.save(processed_dir / f"{split}_labels.npy", labels)
+        pd.DataFrame(metadata_rows).to_csv(processed_dir / f"{split}_metadata.csv", index=False)
+        print(f"Saved {split}: spectra={spectra.shape}, labels={labels.shape}")
 
 
 def main() -> None:
@@ -271,6 +418,12 @@ def main() -> None:
     parser.add_argument("--split-json", default=None)
     parser.add_argument("--processed-dir", default=None)
     parser.add_argument("--limit-samples", type=int, default=None, help="Cap samples per class for debug runs.")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Process count for parallel class generation within each split (e.g. 6 or 32).",
+    )
     args = parser.parse_args()
 
     config = load_yaml(args.config)
@@ -300,9 +453,31 @@ def main() -> None:
     with (processed_dir / "class_names.json").open("w", encoding="utf-8") as f:
         json.dump(config["data"]["classes"], f, indent=2)
 
-    for split in ("train", "val", "test"):
-        sources = split_data["splits"][split]
-        build_split(split, sources, config, processed_dir, raise_dir, image_cache_dir, args.limit_samples)
+    workers = max(1, int(args.workers))
+    if workers > 1:
+        print(f"Parallel preprocess with workers={workers} (train/val/test x classes)")
+        build_all_splits_parallel(
+            split_data,
+            config,
+            processed_dir,
+            raise_dir,
+            image_cache_dir,
+            args.limit_samples,
+            workers,
+        )
+    else:
+        for split in ("train", "val", "test"):
+            sources = split_data["splits"][split]
+            build_split(
+                split,
+                sources,
+                config,
+                processed_dir,
+                raise_dir,
+                image_cache_dir,
+                args.limit_samples,
+                workers=1,
+            )
 
 
 if __name__ == "__main__":

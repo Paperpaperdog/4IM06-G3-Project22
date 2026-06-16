@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*/.venv/
+
+# Data / outputs
+data/
+*/data/
+outputs/
+logs/
+checkpoints/
+runs/
+
+# ML large files
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.hdf5
+
+# Archives
+*.tar.gz
+*.zip
+
+# Large local project
+spectral-mask-resampling/
