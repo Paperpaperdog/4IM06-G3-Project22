@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .venv/
 */.venv/
+.matplotlib-cache/
+.DS_Store
 
 # Data / outputs
 data/
@@ -12,7 +14,7 @@ logs/
 checkpoints/
 runs/
 
-# Keep lightweight experiment summaries under this path tracked.
+# Keep lightweight CNN experiment summaries tracked.
 !CNN/
 !CNN/spectral-history-cnn/
 !CNN/spectral-history-cnn/outputs/
@@ -37,10 +39,23 @@ runs/
 *.tar.gz
 *.zip
 
-# Large local project (track only clean-run summaries under outputs/)
-spectral-mask-resampling/*
-!spectral-mask-resampling/outputs/
-spectral-mask-resampling/outputs/*
+# Classical detector test artifacts (keep CSV summaries only)
+test_images/
+test_results/raise_tiff_downloads*/
+test_results/**/references/
+test_results/**/controlled_sources/
+test_results/**/cases/
+test_results/**/*.png
+test_results/**/*.tif
+test_results/**/*.tiff
+test_results/**/detection_summary_limit*.csv
+
+# Spectral mask: track source + clean-run summaries, ignore generated data
+spectral-mask-resampling/data/
+spectral-mask-resampling/outputs/
+spectral-mask-resampling/.venv/
+spectral-mask-resampling/.matplotlib-cache/
+spectral-mask-resampling/.DS_Store
 !spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/
 !spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/*.json
 !spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/*.csv

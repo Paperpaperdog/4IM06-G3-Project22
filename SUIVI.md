@@ -64,3 +64,34 @@ Stay focused on implementing and validating the aligned baseline, while running 
 - Start a first pilot for Idea 1 (JPEG/x8/x16 confusion check).
 - Start a first pilot for Idea 2 (k = -1, 0, 1 comparison, including shape-related metrics beyond location).
 - Compare pilot outcomes and decide one main direction for the next stage.
+
+# Discussion May 30th
+This week we defined the near-future plan and decided to prioritize dataset construction first.
+
+### Main idea of project:
+Build a complete pipeline from controlled data generation to CNN interpretation, then connect learned features back to mathematical explanation.
+
+### General project steps:
+1. Construct a controlled dataset.
+2. Train a lightweight CNN model to predict the probability of each peak.
+3. Analyze which features the CNN relies on to achieve this result.
+4. Mathematically derive and explain why these features are effective.
+
+### Future work / inspiration:
+1. Use model interpretation results to identify robust discriminative patterns beyond peak location.
+2. Compare data-driven features with hand-crafted spectral/NFA features for consistency.
+3. Use mathematical back-analysis to refine feature design and improve reliability.
+
+### TODO this week:
+- Use original images from RAISE-1K.
+- Convert TIFF images to PNG.
+- Crop images into square format.
+- Choose fixed target sizes (e.g., `384 x 384`) so NFA peak plots are comparable.
+- Choose 3 representative peak/reference sizes (e.g., `64`, `85`, `96`) to simulate different cases.
+- Define 5 reference-size groups with the discussed rule pattern:
+  - `(reference size) + k * {0,1,2}`
+  - `(target size - reference size) + k * {0,1,2}`
+- Resize square PNG images to reference sizes with a fixed interpolation method (e.g., bicubic).
+- Resize/compress each reference image to target size.
+- Compute and collect spectrum graphs and NFA graphs.
+- Label each sample with original/reference size and transformation path for CNN training.
