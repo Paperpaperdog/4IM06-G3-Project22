@@ -1,7 +1,7 @@
 # 实验梳理与结果分析
 
 > 更新日期：2026-06-16  
-> 涵盖三条主线：**经典 NFA**（根目录 + `test`）、**Mask**（`spectral-mask-resampling`）、**CNN**（`spectral-history-cnn`）  
+> 涵盖三条主线：**经典检测**（zzy NFA + test JPEG/×8）、**Mask**（`spectral-mask-resampling`）、**CNN**（`spectral-history-cnn`）  
 > 总览见 [`README.md`](README.md)
 
 ---
@@ -18,7 +18,33 @@
 
 ---
 
-## 二、两条主线实验
+## 零、经典路线：JPEG vs ×8 重采样（`test` 分支，2026-06-16）
+
+> 整合自 `test` 分支**最新提交** `ebf8a9c` 的三脚本管线，与下方 Mask/CNN 深度学习实验互补。
+
+| 脚本 | 作用 |
+|------|------|
+| `create_forensic_postprocess_dataset.py` | 合成 `original` / `jpeg` / `resample_x8` / `mix` 数据集 |
+| `jpeg_resample_detector.py` | 残差 + DCT/FFT 特征 + a contrario，输出 `Label:` |
+| `evaluate_detector_on_dataset.py` | 在数据集 split 上批量评估，打印准确率与混淆矩阵 |
+
+**与 Mask/CNN 的区别**：
+
+- 不训练神经网络；纯手工特征 + NFA 统计判决
+- 聚焦 **JPEG 块效应（8×8）** 与 **×8 块级重采样** 的区分（与项目 W3 讨论的 Idea 1 一致）
+- 数据集由脚本本地生成，结果未入库（需自行运行）
+
+```bash
+python create_forensic_postprocess_dataset.py --input_dir RAW --output_dir dataset_x8 --include_original --mix_order both
+python jpeg_resample_detector.py --image IMG --null_dir dataset_x8/original
+python evaluate_detector_on_dataset.py --detector jpeg_resample_detector.py --dataset_root dataset_x8 --split test --null_dir dataset_x8/train/original
+```
+
+zzy 分支的 NFA 候选尺寸估计（`resampling_core.py` + RAISE100 受控实验）见 [`README.md`](README.md) 路线 A1。
+
+---
+
+## 二、深度学习主线实验
 
 ```mermaid
 flowchart TB

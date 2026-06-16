@@ -6,7 +6,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 
 | 路线 | 分支来源 | 目录 / 入口 | 侧重点 |
 |------|----------|-------------|--------|
-| **A. 经典 NFA 检测** | `zzy_raise100_resized_dataset` + `test` | 根目录 `.py` 文件 | 谱相关 + a contrario NFA；候选原图尺寸估计；SPAI 手工特征 |
+| **A. 经典检测** | `zzy_raise100_resized_dataset` + `test` | 根目录 `.py` | NFA 谱相关 + 候选尺寸估计；**JPEG vs ×8 重采样** a contrario 判别 |
 | **B. 可学习 Mask** | `zzy_raise100_resized_dataset`（代码）+ `xby-branch`（结果） | `spectral-mask-resampling/` | 频域重采样 + 每类 mask/reference；JPEG vs ×8/×16 歧义 |
 | **C. 频谱 CNN** | `xby-branch` | `CNN/spectral-history-cnn/` | 位置编码 CNN；处理历史多类分类 |
 
@@ -15,7 +15,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 
 ---
 
-## 路线 A：经典重采样检测
+## 路线 A：经典重采样 / 压缩检测
 
 ### A1. 模块化 NFA 管线（`zzy_raise100_resized_dataset`）
 
@@ -50,18 +50,57 @@ python detect_resampling.py --image path/to/image.png --outdir outputs
 
 结果摘要（已入库）：`test_results/controlled_resampling_dataset_bicubic_raise100/detection_summary.csv`
 
-### A2. 独立检测器工具（`test` 分支）
+### A2. JPEG vs ×8 重采样管线（`test` 分支，2026-06-16 最新提交）
+
+> **`test` 分支本次整合的核心**：三条脚本组成完整取证实验闭环（数据集合成 → 单图检测 → 批量评估）。
 
 | 文件 | 说明 |
 |------|------|
-| `ResamplingDetector.py` | 自包含 NFA 检测 CLI（rank/TV 预处理、JPEG 伪峰抑制） |
-| `spai_detector_new.py` | ~268 维手工取证特征 + Random Forest（5 类） |
-| `jpeg_resample_detector.py` | JPEG / 重采样联合检测实验 |
-| `create_forensic_postprocess_dataset.py` | 取证后处理数据集构建 |
-| `evaluate_detector_on_dataset.py` | 数据集上评估检测器 |
-| `img/` | 演示用测试图（baboon、pashmina 等） |
+| `create_forensic_postprocess_dataset.py` | 由原始图批量生成 `original` / `jpeg` / `resample_x8` / `mix` 四类 PNG |
+| `jpeg_resample_detector.py` | 残差 + DCT/FFT 特征 + a contrario NFA，判别 JPEG / ×8 重采样 / 混合 / 原图 |
+| `evaluate_detector_on_dataset.py` | 在合成数据集上批量调用检测器，输出准确率与混淆矩阵 |
 
-详细用法：[`README_spai_detector.md`](README_spai_detector.md)、[`README_ResamplingDetector.md`](README_ResamplingDetector.md)
+**方法要点**（`jpeg_resample_detector.py`）：
+
+1. 灰度图 → 预测残差 → DCT 块效应与 FFT 周期特征
+2. 用 `null_dir` 中干净图（或相位随机 surrogate）建立零假设分布
+3. 对 JPEG / 重采样特征分别算 NFA 与加权得分，输出 `Label: ...`
+
+**典型流程**：
+
+```bash
+# 1) 合成取证数据集（×8 块级重采样 + JPEG Q85 + 混合顺序）
+python create_forensic_postprocess_dataset.py \
+  --input_dir path/to/raw_images \
+  --output_dir dataset_x8 \
+  --include_original \
+  --mix_order both
+
+# 2) 单图检测
+python jpeg_resample_detector.py \
+  --image dataset_x8/jpeg/example_jpeg_q85.png \
+  --null_dir dataset_x8/original
+
+# 3) 在 test split 上评估
+python evaluate_detector_on_dataset.py \
+  --detector jpeg_resample_detector.py \
+  --dataset_root dataset_x8 \
+  --split test \
+  --null_dir dataset_x8/train/original \
+  --max_per_class 50
+```
+
+输出标签包括：`jpeg_compression`、`8x8_resampling`、`jpeg_and_8x8_resampling`、`original_or_uncertain` 等。
+
+### A3. 早期独立工具（`test` 分支历史提交，非本次整合重点）
+
+| 文件 | 说明 |
+|------|------|
+| `ResamplingDetector.py` | 自包含 NFA 重采样 CLI（rank/TV 预处理） |
+| `spai_detector_new.py` | 手工取证特征 + Random Forest（5 类） |
+| `img/` | 演示图（baboon、pashmina） |
+
+文档：[`README_ResamplingDetector.md`](README_ResamplingDetector.md)、[`README_spai_detector.md`](README_spai_detector.md)
 
 ---
 
@@ -129,6 +168,6 @@ bash scripts/run_v1_pipeline_full.sh
 |--------|----------------|
 | `xby-branch` | CNN 管线、Mask 实验结果、`EXPERIMENT_SUMMARY.md` |
 | `zzy_raise100_resized_dataset` | Mask 源码、RAISE 受控数据集管线、NFA 核心实现 |
-| `test` | `ResamplingDetector`、SPAI 检测器、演示图 |
+| `test` | **JPEG vs ×8 重采样三脚本管线**（`create_forensic_postprocess_dataset.py`、`jpeg_resample_detector.py`、`evaluate_detector_on_dataset.py`）；早期工具见 A3 |
 
 整合分支：`project-integration`
