@@ -3,7 +3,7 @@ set -euo pipefail
 
 export PYTHONPATH=.
 
-RAISE_CSV="${RAISE_CSV:-../RAISE_1k.csv}"
+RAISE_CSV="${RAISE_CSV:-../data/raise_raw/RAISE_1k.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-data/raw/raise_tiff}"
 
 if [[ -n "${LIMIT:-}" ]]; then

@@ -279,7 +279,7 @@ python spectral-mask-resampling/scripts/plot_mask_results.py
 
 ## 六、其他相关工作（背景）
 
-1. **`detect_resampling.py`**：论文 NFA 基线的二分类（RESAMPLED / NOT_RESAMPLED），rank residual + 谱相关。
+1. **`demo_resampling_detection.py`** / **`resampling_core.py`**：论文 NFA 基线，谱相关 + a contrario。
 2. **`data/protocol_dataset/`**：`a→c` vs `b→c` 歧义协议实验（不同 reference size 缩到同一 target）。
 3. **`SUIVI.md`**：记录了从论文复现到 JPEG/×8/×16 歧义、CNN 方向的演进。
 4. **`notes.md`**（项目根目录）：教授关于频谱特征、位置编码、DC 抑制的技术指导。
@@ -311,4 +311,4 @@ python spectral-mask-resampling/scripts/plot_mask_results.py
 | CNN 训练曲线 | `CNN/spectral-history-cnn/outputs/train_log.csv` |
 | CNN 4 类配置 | `CNN/spectral-history-cnn/configs/v1_final64_poscnn_local.yaml` |
 | 周报记录 | `SUIVI.md` |
-| RAISE 数据 | `data/RAISE_1k.csv`，`spectral-mask-resampling/data/raw/raise_tiff/` |
+| RAISE 数据 | `data/raise_raw/RAISE_1k.csv`，`spectral-mask-resampling/data/raw/raise_tiff/` |

@@ -6,13 +6,17 @@ __pycache__/
 .matplotlib-cache/
 .DS_Store
 
-# Data / outputs (see data/.gitignore for pilot result rules)
+# Local demo / paper assets
+*.pdf
+RAISE_1k.csv
+/test*.png
+
+# Data caches (track index + pilot summaries only; see data/.gitignore)
 data/raise_png/
 data/generated/
 data/images_png/
 data/images_tif/
 data/protocol_dataset/
-data/RAISE_1k.csv
 data/raise_raw/tiff/
 data/raise_raw/*.tif
 data/raise_raw/*.TIF
@@ -21,6 +25,9 @@ outputs/
 logs/
 checkpoints/
 runs/
+
+# CNN: no vendored deps or large zips in git
+CNN/spectral-history-cnn/.pydeps_npu/
 
 # Keep lightweight CNN experiment summaries tracked.
 !CNN/
@@ -47,7 +54,7 @@ runs/
 *.tar.gz
 *.zip
 
-# Classical detector test artifacts (keep CSV summaries only)
+# Classical detector test artifacts (CSV summaries only)
 test_images/
 test_results/raise_tiff_downloads*/
 test_results/**/references/
@@ -58,7 +65,7 @@ test_results/**/*.tif
 test_results/**/*.tiff
 test_results/**/detection_summary_limit*.csv
 
-# Spectral mask: track source + clean-run summaries only
+# Spectral mask: clean-run summaries only
 spectral-mask-resampling/data/
 spectral-mask-resampling/outputs/
 spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask/

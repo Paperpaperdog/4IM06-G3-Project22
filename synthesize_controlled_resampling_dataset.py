@@ -310,7 +310,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("limit_images", type=int, nargs="?", default=100)
     parser.add_argument("--image-dir", type=Path, default=Path("test_images"))
-    parser.add_argument("--raise-csv", type=Path, default=Path("RAISE_1k.csv"))
+    parser.add_argument("--raise-csv", type=Path, default=Path("data/raise_raw/RAISE_1k.csv"))
     parser.add_argument("--download", action="store_true", help="download TIFF files from the CSV TIFF column")
     parser.add_argument("--download-dir", type=Path, default=Path("test_results/raise_tiff_downloads"))
     parser.add_argument("--force-download", action="store_true")

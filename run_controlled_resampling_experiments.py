@@ -309,7 +309,7 @@ def run_experiment(args: argparse.Namespace) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--image-dir", type=Path, default=Path("test_images"))
-    parser.add_argument("--raise-csv", type=Path, default=Path("RAISE_1k.csv"))
+    parser.add_argument("--raise-csv", type=Path, default=Path("data/raise_raw/RAISE_1k.csv"))
     parser.add_argument("--outdir", type=Path, default=Path("test_results/controlled_resampling"))
     parser.add_argument("--limit-images", type=int, default=1)
     parser.add_argument("--source-sizes", default="256,320,448,512,640")

@@ -17,7 +17,7 @@ All samples may have different observed image sizes. Their residual spectra are 
 
 Version 1 intentionally includes only the basic experiment:
 
-- RAISE-1k source images from `../RAISE_1k.csv`, using the `TIFF` URL column.
+- RAISE-1k source images from `../data/raise_raw/RAISE_1k.csv`, using the `TIFF` URL column.
 - Image-level train/val/test split.
 - Four-class ambiguity experiment: `original`, `JPEG_Q80`, `downsample_x8`, `downsample_x16`.
 - Observed image sizes: `128, 96, 64, 48, 32`.
@@ -123,7 +123,7 @@ pip install -r requirements.txt
 
 ## Prepare Data
 
-By default the preparation script reads the repository-level `../RAISE_1k.csv` file and uses its `TIFF` URL column. Downloaded TIFF files are cached under `data/raw/raise_tiff/`.
+By default the preparation script reads the repository-level `../data/raise_raw/RAISE_1k.csv` file and uses its `TIFF` URL column. Downloaded TIFF files are cached under `data/raw/raise_tiff/`.
 
 ```bash
 bash scripts/run_v1_prepare.sh
@@ -138,7 +138,7 @@ set -e
 export PYTHONPATH=.
 
 python src/data/split_raise.py \
-  --input-csv ../RAISE_1k.csv \
+  --input-csv ../data/raise_raw/RAISE_1k.csv \
   --url-column TIFF \
   --output-json data/splits/raise_split_seed123.json \
   --train 700 --val 150 --test 150 --seed 123
@@ -169,7 +169,7 @@ For a smoke test:
 export PYTHONPATH=.
 
 python src/data/split_raise.py \
-  --input-csv ../RAISE_1k.csv \
+  --input-csv ../data/raise_raw/RAISE_1k.csv \
   --url-column TIFF \
   --output-json data/splits/debug_raise_split_seed123.json \
   --train 700 --val 150 --test 150 --seed 123
@@ -330,24 +330,6 @@ The most important grouped metrics are:
 - accuracy for observed size 32
 
 If observed size 32 performs much worse, this may be caused by the very small original spectrum before interpolation, rather than by a failure of the mask model itself.
-
-## Held-Out Observed Size Test
-
-After the normal Version 1 run works, add a held-out observed size test without changing the model:
-
-```text
-train observed sizes: 128, 64, 32
-test observed sizes: 96, 48
-```
-
-If the model still distinguishes JPEG from downsample_x8/x16 on unseen observed sizes, this supports the normalized frequency-grid design.
-
-This can be implemented as a second split/config, for example:
-
-```text
-configs/v1_fourier_ambiguity_mask_heldout_size.yaml
-outputs/v1_fourier_ambiguity_mask_heldout_size/
-```
 
 ## Implementation Notes
 

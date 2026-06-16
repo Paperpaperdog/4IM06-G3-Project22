@@ -2,7 +2,7 @@ experiment_name: v1_final64_poscnn4
 
 paths:
   # Relative to this project root. The CSV contains RAISE TIFF URLs.
-  raise_csv: ../../data/RAISE_1k.csv
+  raise_csv: ../../data/raise_raw/RAISE_1k.csv
   raise_dir: null
   image_cache_dir: data/raw/raise_tiff
   split_json: data/splits/raise_split_seed123.json

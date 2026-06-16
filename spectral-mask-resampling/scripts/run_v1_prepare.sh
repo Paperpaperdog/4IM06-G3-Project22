@@ -3,7 +3,7 @@ set -e
 
 export PYTHONPATH=.
 
-RAISE_CSV="${RAISE_CSV:-../RAISE_1k.csv}"
+RAISE_CSV="${RAISE_CSV:-../data/raise_raw/RAISE_1k.csv}"
 
 python src/data/split_raise.py \
   --input-csv "${RAISE_CSV}" \

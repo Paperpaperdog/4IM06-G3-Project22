@@ -3,7 +3,7 @@ set -euo pipefail
 
 export PYTHONPATH=.
 
-RAISE_CSV="${RAISE_CSV:-../../data/RAISE_1k.csv}"
+RAISE_CSV="${RAISE_CSV:-../../data/raise_raw/RAISE_1k.csv}"
 
 python src/data/split_raise.py \
   --csv "$RAISE_CSV" \

@@ -95,7 +95,7 @@ PY
 This version uses the RAISE CSV metadata file and downloads the TIFF image URL on demand.
 
 ```text
-../../data/RAISE_1k.csv
+../../data/raise_raw/RAISE_1k.csv
 ```
 
 The relative path above is from this project root:
@@ -137,7 +137,7 @@ The default config already uses relative paths:
 
 ```yaml
 paths:
-  raise_csv: ../../data/RAISE_1k.csv
+  raise_csv: ../../data/raise_raw/RAISE_1k.csv
   image_cache_dir: data/raw/raise_tiff
   split_json: data/splits/raise_split_seed123.json
   processed_dir: data/processed/v1_final64_tv_rfft
@@ -154,7 +154,7 @@ If your CSV is somewhere else on the server, either edit the YAML or pass it thr
 export RAISE_CSV=/path/to/RAISE_1k.csv
 ```
 
-The provided prepare script uses `RAISE_CSV` if it is set. If not, it uses `../../data/RAISE_1k.csv`.
+The provided prepare script uses `RAISE_CSV` if it is set. If not, it uses `../../data/raise_raw/RAISE_1k.csv`.
 
 ## Full Version 1 Run
 
@@ -162,7 +162,7 @@ From the project root:
 
 ```bash
 chmod +x scripts/*.sh
-export RAISE_CSV=../../data/RAISE_1k.csv
+export RAISE_CSV=../../data/raise_raw/RAISE_1k.csv
 
 scripts/run_v1_prepare.sh
 scripts/run_v1_train.sh
@@ -205,7 +205,7 @@ Before the full run, use a small split and small cached dataset.
 
 ```bash
 export PYTHONPATH=.
-export RAISE_CSV=../../data/RAISE_1k.csv
+export RAISE_CSV=../../data/raise_raw/RAISE_1k.csv
 
 python src/data/split_raise.py \
   --csv "$RAISE_CSV" \
