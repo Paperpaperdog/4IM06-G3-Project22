@@ -301,5 +301,5 @@ bash scripts/run_v1_train.sh  # 需指定对应 config
 |------|------|
 | 6 类配置 | `configs/v1_final64_poscnn.yaml` |
 | 4 类配置 | `configs/v1_final64_poscnn_local.yaml` |
-| 测试指标 | `outputs/metrics_test.json` |
+| 测试指标 | `outputs/v1_final64_poscnn/metrics_test.json` |
 | 子项目 README | [`../CNN/spectral-history-cnn/README.md`](../CNN/spectral-history-cnn/README.md) |

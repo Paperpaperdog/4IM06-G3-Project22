@@ -17,6 +17,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 | 文档 | 内容 |
 |------|------|
 | [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) | **总体实验报告**（摘要、三路线、对比、结论） |
+| [`docs/SUPPLEMENTARY_EXPERIMENTS.md`](docs/SUPPLEMENTARY_EXPERIMENTS.md) | **补充实验清单**（命令、表格模板、执行顺序） |
 | [`docs/00_project_overview.md`](docs/00_project_overview.md) | 原项目、复现时间线、主要发现汇总 |
 | [`docs/01_classical_detection.md`](docs/01_classical_detection.md) | 经典检测（pilots / NFA / JPEG×8） |
 | [`docs/02_spectral_mask.md`](docs/02_spectral_mask.md) | Mask 路线全流程 |
@@ -86,7 +87,7 @@ python evaluate_detector_on_dataset.py --detector jpeg_resample_detector.py --da
 
 ### 归档
 
-早期 `ResamplingDetector` / `spai` / 重复 CLI → [`archive/legacy_test_tools/`](archive/legacy_test_tools/)
+早期 `ResamplingDetector` / `spai` / 重复 CLI / NFA 示意图 → [`archive/`](archive/)
 
 ---
 
@@ -122,9 +123,11 @@ cd CNN/spectral-history-cnn && bash scripts/run_v1_pipeline_full.sh
 
 | 路径 | 入库 |
 |------|------|
-| `data/raise_raw/RAISE_1k.csv` | 是（索引） |
+| `data/raise_raw/RAISE_1k.csv` | 是（索引，**唯一路径**） |
 | `data/manifest.csv`、`data/pilot_results/PILOT_SUMMARY.md` | 是 |
-| `test_results/**/*.csv`（经典实验摘要） | 部分 |
+| `test_results/**/*.csv`（经典实验摘要） | 是（含 `nfa_candidate_topk_summary.csv`） |
+| `scripts/analysis/` | 是（E2/E4 补充分析） |
+| `archive/early_nfa_demos/` | 是（早期 NFA 示意图） |
 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/` | 是（json/csv/png） |
-| `CNN/spectral-history-cnn/outputs/` | 部分（指标与图） |
-| TIFF、checkpoint、`*.pt`、`*.npy`、PDF、zip | 否（本地生成） |
+| `CNN/spectral-history-cnn/outputs/v1_final64_poscnn/` | 是（指标、图、csv；不含 `*.pt`） |
+| 本地 `data/RAISE_1k.csv`、`data/*_png/`、TIFF、checkpoint | 否 |

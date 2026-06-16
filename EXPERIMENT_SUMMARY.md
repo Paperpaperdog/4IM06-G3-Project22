@@ -1,6 +1,6 @@
 # 实验梳理与结果分析
 
-> 更新日期：2026-06-16  
+> 更新日期：2026-06-16（含补充实验 E2/E4）  
 > 涵盖三条主线：**经典检测**（zzy NFA + test JPEG/×8）、**Mask**（`spectral-mask-resampling`）、**CNN**（`spectral-history-cnn`）  
 > 总览见 [`README.md`](README.md) · **总体报告** [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) · 详细文档 [`docs/00_project_overview.md`](docs/00_project_overview.md)
 
@@ -41,6 +41,7 @@ python evaluate_detector_on_dataset.py --detector jpeg_resample_detector.py --da
 ```
 
 zzy 分支的 NFA 候选尺寸估计（`resampling_core.py` + RAISE100 受控实验）见 [`README.md`](README.md) 路线 A1。  
+**E4 定量结果**（N=9000）：top-1 命中率 **11.1%**，显著峰检出 **91.0%**——见 `test_results/nfa_candidate_topk_summary.csv` 与 [`PROJECT_REPORT.md` §9.2](docs/PROJECT_REPORT.md)。  
 **W3 先导实验**（`main` 分支 `pilots/`、10 张 RAISE 结论）见 [`REPORT.zh.md`](REPORT.zh.md) 与 `data/pilot_results/PILOT_SUMMARY.md`。
 
 ---
@@ -76,7 +77,7 @@ flowchart TB
 | 频谱尺寸 | 统一插值到 **512×257**（cycles/pixel 归一化网格） | 原生 **64×33** |
 | 模型 | 每类一个 mask \(M_k\) + reference \(R_k\)，sigmoid mask 后与谱做 cosine similarity | 轻量 CNN + 正弦位置编码（λ=1,2,4,8,16,32） |
 | 科学侧重 | JPEG vs ×8/×16 **歧义**（Fourier-only 能否分开） | 处理历史分类 + 混淆模式分析 |
-| 结果文件 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/` | `CNN/spectral-history-cnn/outputs/metrics_test.json` 等 |
+| 结果文件 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/` | `CNN/spectral-history-cnn/outputs/v1_final64_poscnn/` |
 | 测试集规模 | **20000**（每类 5000，含 5 种观测尺寸） | **9000**（每类 1500，固定 64×64） |
 
 ---
@@ -220,7 +221,7 @@ python spectral-mask-resampling/scripts/plot_mask_results.py
 
 - 配置：`CNN/spectral-history-cnn/configs/v1_final64_poscnn_local.yaml`（已改为 4 类）
 - 训练日志：`CNN/spectral-history-cnn/outputs/train_log.csv`
-- 测试指标：`CNN/spectral-history-cnn/outputs/metrics_test.json`
+- 测试指标：`CNN/spectral-history-cnn/outputs/v1_final64_poscnn/metrics_test.json`
 - 预测明细：`CNN/spectral-history-cnn/outputs/predictions_test.csv`
 
 ### 4.2 测试集结果（9000 样本）
@@ -253,7 +254,22 @@ python spectral-mask-resampling/scripts/plot_mask_results.py
 2. **真正难的是下采样因子区分**：×4/×8/×16 三者互相混淆严重，尤其 ×8 几乎被吸到 ×16（680 例）。这与 6 类设定下 ×8 频谱特征更接近 ×16 一致。
 3. **与 Mask 路线的科学问题不完全重合**：6 类 CNN 里 JPEG vs ×8/×16 **不是**主要瓶颈；Mask 专注的 ambiguity 在 CNN 上反而表现较好。CNN 的弱点是**倍率细分**。
 4. **过拟合明显**：应优先用 epoch 5 左右的 checkpoint，或加 early stopping / 更强正则。
-5. **4 类实验已配置但未出结果**：`v1_final64_poscnn4` 已改为 4 类（去掉 ×2/×4），与 Mask 对齐；NPU 训练仍在进行或待完成。
+5. **4 类实验已配置但未出结果**：`v1_final64_poscnn4` 已改为 4 类（去掉 ×2/×4），与 Mask 对齐；待 GPU/NPU 训练（E1）。
+
+### 4.5 补充分析 E2：6 类设定消融（已完成）
+
+从 6 类混淆矩阵抽取 original/JPEG/×8/×16，**不重训**（`scripts/analysis/e2_cnn6_ablation.py`）：
+
+| 指标 | 值 |
+|------|-----|
+| 6 类 acc | 62.5% |
+| 4 类子集 acc | **76.1%**（虚高：×2/×4 误判样本被排除） |
+| 4 类 macro F1 | 0.713 |
+| ×8/×16 二分类 acc | **53.9%** |
+| ×8→×4 桥梁 | 351 例 |
+| ×8→×16 | 680 例 |
+
+详见 [`docs/tables/e2_cnn6_ablation.md`](docs/tables/e2_cnn6_ablation.md)。
 
 ---
 
@@ -289,11 +305,14 @@ python spectral-mask-resampling/scripts/plot_mask_results.py
 ## 七、当前缺口与建议下一步
 
 1. ~~补 Mask 分类指标与可视化~~ ✅ 已完成（`v1_fourier_ambiguity_mask_clean`）。
-2. **跑完 4 类 CNN**（`v1_final64_poscnn4`），与 Mask 同任务对比。
-3. **CNN early stopping**：用 val 最佳 epoch（≈5）而非 epoch 50。
-4. **报告里分开写两类结论**：
+2. ~~6 类 CNN 消融（E2）~~ ✅ 已完成 → `docs/tables/e2_cnn6_ablation.md`。
+3. ~~受控 NFA top-k 分析（E4）~~ ✅ 已完成 → `test_results/nfa_candidate_topk_summary.csv`。
+4. **跑完 4 类 CNN**（`v1_final64_poscnn4`，E1），与 Mask 同任务对比。
+5. **CNN early stopping**：用 val 最佳 epoch（≈5）而非 epoch 50。
+6. **JPEG/×8 DCT 管线**（E3）在 `dataset_x8` 上出定量报告。
+7. **报告里分开写两类结论**：
    - Mask：分类准确率 + 频带可分离性（mask overlap）+ per-size 分析 + 图表（`figures/summary/`）
-   - CNN：分类性能 + 混淆结构
+   - CNN：分类性能 + 混淆结构 + E2 消融
 
 ---
 
@@ -307,7 +326,7 @@ python spectral-mask-resampling/scripts/plot_mask_results.py
 | Mask 汇总图表 | `.../figures/summary/*.png` |
 | Mask 按尺寸混淆矩阵 | `.../figures/confusion_matrix_by_observed_size/` |
 | Mask 绘图脚本 | `spectral-mask-resampling/scripts/plot_mask_results.py` |
-| CNN 测试指标 | `CNN/spectral-history-cnn/outputs/metrics_test.json` |
+| CNN 测试指标 | `CNN/spectral-history-cnn/outputs/v1_final64_poscnn/metrics_test.json` |
 | CNN 训练曲线 | `CNN/spectral-history-cnn/outputs/train_log.csv` |
 | CNN 4 类配置 | `CNN/spectral-history-cnn/configs/v1_final64_poscnn_local.yaml` |
 | 周报记录 | `SUIVI.md` |

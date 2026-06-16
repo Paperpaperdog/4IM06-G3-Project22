@@ -10,6 +10,10 @@ __pycache__/
 *.pdf
 RAISE_1k.csv
 /test*.png
+data/RAISE_1k.csv
+
+# Pilot run logs (keep PILOT_SUMMARY.md only)
+data/pilot_results/*.log
 
 # Data caches (track index + pilot summaries only; see data/.gitignore)
 data/raise_png/
@@ -32,14 +36,14 @@ CNN/spectral-history-cnn/.pydeps_npu/
 # Keep lightweight CNN experiment summaries tracked.
 !CNN/
 !CNN/spectral-history-cnn/
-!CNN/spectral-history-cnn/outputs/
-!CNN/spectral-history-cnn/outputs/*.json
-!CNN/spectral-history-cnn/outputs/*.csv
-!CNN/spectral-history-cnn/outputs/figures/
-!CNN/spectral-history-cnn/outputs/figures/*.png
-!CNN/spectral-history-cnn/outputs/figures/*.jpg
-!CNN/spectral-history-cnn/outputs/figures/*.jpeg
-!CNN/spectral-history-cnn/outputs/figures/*.pdf
+!CNN/spectral-history-cnn/outputs/v1_final64_poscnn/
+!CNN/spectral-history-cnn/outputs/v1_final64_poscnn/**
+# Ignore duplicate flat outputs/ copies (canonical: outputs/v1_final64_poscnn/)
+CNN/spectral-history-cnn/outputs/metrics.json
+CNN/spectral-history-cnn/outputs/metrics_test.json
+CNN/spectral-history-cnn/outputs/predictions_test.csv
+CNN/spectral-history-cnn/outputs/train_log.csv
+CNN/spectral-history-cnn/fusion_result.json
 
 # ML large files
 *.npy
@@ -63,7 +67,7 @@ test_results/**/cases/
 test_results/**/*.png
 test_results/**/*.tif
 test_results/**/*.tiff
-test_results/**/detection_summary_limit*.csv
+test_results/controlled_resampling_raise1_sample/
 
 # Spectral mask: clean-run summaries only
 spectral-mask-resampling/data/

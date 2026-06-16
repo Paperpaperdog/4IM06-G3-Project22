@@ -152,6 +152,18 @@ RAISE TIFF → 中心裁方 PNG → 生成 7 种条件（384×384）
 - 实现 `candidate_estimation.py`：由峰距离 \(d\) 枚举候选原图尺寸 \(N = kC \pm d\)
 - 入库 `test_results/controlled_resampling_dataset_bicubic_raise100/detection_summary.csv`
 
+**候选尺寸估计结果**（补充实验 E4，`scripts/analysis/e4_nfa_candidate_topk.py`，N=9000 行）：
+
+| 指标 | vertical | horizontal | 合计 |
+|------|----------|------------|------|
+| top-1 命中率（`true_rank`=1） | 11.1% | 11.1% | **11.1%** |
+| top-3 命中率（`true_rank`≤3） | 37.2% | 37.8% | **37.5%** |
+| `best_distance` = `designed_peak` | 22.9% | 23.6% | **23.3%** |
+| 显著检测率（`best_nfa` < 1） | 89.3% | 92.7% | **91.0%** |
+| 无有效排名（`true_rank` 空） | 59.0% | 58.0% | **58.5%** |
+
+**解读**：在**已知 ground truth** 的受控合成集上，NFA **经常能检出显著周期峰**（91%），但 **top-1 候选尺寸命中率仅 11%**——与 W3 真实 RAISE 上「峰不可分」形成对照：问题不仅是「检不出」，更是「检出了也定不准」。
+
 **价值**：在**已知真值**的合成数据上评估 NFA 行为，与 W3 真实 RAISE 结论对照。
 
 ### 3.4 实验 A2：JPEG vs ×8 块重采样（test 分支）
@@ -333,6 +345,32 @@ flowchart LR
 | ×4 ↔ ×8 | 553 | 相邻倍率混淆 |
 | original ↔ JPEG | 106 | 相对可控 |
 
+### 5.3.1 补充分析：6 类设定消融（E2）
+
+从现有 6 类混淆矩阵中抽取 original / JPEG / ×8 / ×16 四列，**不重训**（`scripts/analysis/e2_cnn6_ablation.py`）：
+
+| 指标 | 6 类（完整） | 4 类子集（后处理抽取） |
+|------|-------------|------------------------|
+| 测试准确率 | **62.5%** | **76.1%** |
+| Macro F1 | — | **0.713** |
+| ×8/×16 二分类 acc | — | **53.9%**（接近随机） |
+
+**4 类子集 per-class F1**（注意：×2/×4 被误判的样本不再计入，故 acc 会**虚高**）：
+
+| original | JPEG | ×8 | ×16 |
+|----------|------|-----|------|
+| 0.937 | 0.944 | 0.347 | 0.622 |
+
+**6 类特有的「桥梁」混淆**：
+
+| 混淆对 | 数量 | 含义 |
+|--------|------|------|
+| ×8 → ×4 | **351** | ×4 吸收部分 ×8 样本 |
+| ×4 → ×8 | 202 | 反向桥梁 |
+| ×8 → ×16 | 680 | 主瓶颈（与 4 类任务一致） |
+
+**结论**：6 类设定**人为增加了** ×2/×4 中间类，使 ×8 更易被 ×4 吸收；但即使只看 4 类子集，×8/×16 二分类仍仅 53.9%。**公平对比仍需 E1 的 4 类重训**（`v1_final64_poscnn4`）。
+
 ### 5.4 路线 C 结论
 
 1. **TV residual + log 频谱 + CNN 对 original/JPEG 极强**（F1≈0.91），远超 Mask。
@@ -390,14 +428,15 @@ flowchart TB
 2. 可学习 mask 与 CNN 均**显著优于随机**，但远未解决全部类别。
 3. 观测尺寸减小**单调降低**分类性能。
 4. CNN 位置编码 + 卷积对 original/JPEG **非常有效**。
-5. 经典 NFA 在 RAISE 真实 PNG 重采样上**峰值不可分**。
+5. 经典 NFA 在 RAISE 真实 PNG 重采样上**峰值不可分**（W3）。
+6. 受控合成集上 NFA **能检出显著峰**（91%），但 **top-1 候选尺寸命中率仅 11%**（E4）。
+7. 6 类 CNN 中 ×4 充当 ×8 的**混淆桥梁**（×8→×4：351 例）；4 类子集 ×8/×16 二分类 acc 仅 **53.9%**（E2）。
 
 **未证实 / 待完成**：
 
-1. 4 类 CNN 与 Mask 的**公平对比**（同 4 类、同 split）。
-2. JPEG/×8 DCT 管线在大规模数据上的定量准确率。
+1. 4 类 CNN 与 Mask 的**公平对比**（同 4 类、同 split、独立重训，E1）。
+2. JPEG/×8 DCT 管线在大规模数据上的定量准确率（E3）。
 3. Fourier + DCT **混合模型**是否显著改善 ×8/×16 区分。
-4. 候选原图尺寸估计在受控集上的**排序准确率**系统分析。
 
 ---
 
@@ -422,9 +461,10 @@ flowchart TB
 ### 7.3 为何 CNN 在倍率上仍困难？
 
 1. ×8 与 ×16 在 64×33 原生谱上**频率分辨率有限**。
-2. 6 类设定使 ×4 成为 ×8/×16 之间的**混淆桥梁**。
-3. 训练过拟合（epoch 5 后 val 停滞）导致高频细节未泛化。
-4. 固定 64×64 丢失了 Mask 实验中「多尺寸」提供的部分信息。
+2. 6 类设定使 ×4 成为 ×8/×16 之间的**混淆桥梁**（×8→×4：**351** 例，E2）。
+3. 即使从 6 类结果抽取 4 类子集，×8/×16 二分类 acc 仍仅 **53.9%**（E2）。
+4. 训练过拟合（epoch 5 后 val 停滞）导致高频细节未泛化。
+5. 固定 64×64 丢失了 Mask 实验中「多尺寸」提供的部分信息。
 
 ### 7.4 负结果的价值
 
@@ -451,13 +491,15 @@ flowchart TB
 
 ### 8.2 建议下一步
 
-| 优先级 | 工作 |
-|--------|------|
-| 高 | 跑通 **4 类 CNN**（`v1_final64_poscnn4`），与 Mask 公平对比 |
-| 高 | CNN **early stopping**（≈epoch 5 best checkpoint） |
-| 中 | **Fourier + DCT** 混合分支（Mask README Version 4 方向） |
-| 中 | JPEG/×8 三脚本在大规模 `dataset_x8` 上出报告 |
-| 低 | 多观测尺寸 CNN；held-out size 泛化实验 |
+| 优先级 | 工作 | 状态 |
+|--------|------|------|
+| 高 | 跑通 **4 类 CNN**（`v1_final64_poscnn4`），与 Mask 公平对比 | 待完成（E1） |
+| 高 | CNN **early stopping**（≈epoch 5 best checkpoint） | 配置已有，随 E1 执行 |
+| 中 | JPEG/×8 三脚本在 `dataset_x8` 上出报告 | 待完成（E3） |
+| 中 | **Fourier + DCT** 混合分支 | 未开始 |
+| 低 | 多观测尺寸 CNN；held-out size 泛化实验 | 未开始 |
+| — | 6 类 CNN 消融（E2） | ✅ 已完成 |
+| — | 受控 NFA top-k 分析（E4） | ✅ 已完成 |
 
 ### 8.3 仓库与文档
 
@@ -466,9 +508,56 @@ flowchart TB
 | 入口 README | [`README.md`](../README.md) |
 | 实验数字速查 | [`EXPERIMENT_SUMMARY.md`](../EXPERIMENT_SUMMARY.md) |
 | W3 中文报告 | [`REPORT.zh.md`](../REPORT.zh.md) |
+| 补充实验清单 | [`SUPPLEMENTARY_EXPERIMENTS.md`](SUPPLEMENTARY_EXPERIMENTS.md) |
+| E2 消融表 | [`tables/e2_cnn6_ablation.md`](tables/e2_cnn6_ablation.md) |
+| E4 NFA top-k | `test_results/nfa_candidate_topk_summary.csv` |
 | 方法详解 | [`docs/01`](01_classical_detection.md) [`02`](02_spectral_mask.md) [`03`](03_spectral_cnn.md) |
 | Mask 结果 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/` |
 | CNN 结果 | `CNN/spectral-history-cnn/outputs/` |
+
+---
+
+## 9. 补充实验（2026-06-16）
+
+> 详见 [`SUPPLEMENTARY_EXPERIMENTS.md`](SUPPLEMENTARY_EXPERIMENTS.md)。本节汇总已完成的 **E2**、**E4**；**E1**（4 类 CNN）、**E3**（DCT 管线）仍待跑。
+
+### 9.1 E2：6 类 CNN 设定消融
+
+**目的**：判断 6 类任务是否人为增加了 ×8/×16 混淆难度。  
+**方法**：从 `outputs/v1_final64_poscnn/metrics_test.json` 混淆矩阵抽取 4 类子集，不重训。
+
+| 分析 | 结果 |
+|------|------|
+| 6 类总体 acc | **62.5%** |
+| 4 类子集 acc（去掉 ×2/×4 样本） | **76.1%** |
+| 4 类 macro F1 | **0.713** |
+| ×8↔×16 互相误判（6 类） | 680 + 301 = **981** |
+| ×8→×4 桥梁混淆（6 类特有） | **351** |
+| ×8/×16 二分类 acc | **53.9%** |
+
+**结论**：去掉 ×2/×4 后 acc 升至 76%，但主要来自 **×2/×4 吸收的错误样本不再计入**；×8/×16 二分类仍接近随机。**不能**用 76.1% 与 Mask 56.6% 直接对比——需 E1 独立 4 类训练。
+
+### 9.2 E4：受控 NFA 候选尺寸 top-k
+
+**目的**：在 RAISE100 bicubic 受控集（N=9000）上量化 NFA 候选估计能力。  
+**数据**：`test_results/controlled_resampling_dataset_bicubic_raise100/detection_summary.csv`
+
+| 指标 | vertical | horizontal | 合计 |
+|------|----------|------------|------|
+| top-1 命中率 | 11.1% | 11.1% | **11.1%** |
+| top-3 命中率 | 37.2% | 37.8% | **37.5%** |
+| 峰距离 = designed peak | 22.9% | 23.6% | **23.3%** |
+| 显著检测（NFA < 1） | 89.3% | 92.7% | **91.0%** |
+| 无有效排名 | 59.0% | 58.0% | **58.5%** |
+
+**结论**：与 W3（RAISE 真实数据，PNG 重采样峰不可分）互补——受控合成上 NFA **能频繁检出显著峰**，但 **定位正确候选尺寸的 top-1 率仅 ~11%**。经典路线瓶颈是「检出了也定不准」，而非单纯灵敏度不足。
+
+### 9.3 待完成实验
+
+| ID | 内容 | 阻塞项 |
+|----|------|--------|
+| E1 | 4 类 CNN `v1_final64_poscnn4` + best.pt | 需 GPU/NPU 训练 |
+| E3 | JPEG/×8 DCT 管线 `dataset_x8` 评估 | 需准备 test split 目录 |
 
 ---
 
