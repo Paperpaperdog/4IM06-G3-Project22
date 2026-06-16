@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Vendor CNN deps for container torch_npu: copy from project venv (no pip on compute node).
 #
+# NumPy/SciPy are NOT vendored: Ascend ACL requires NumPy 1.x from the container.
+#
 # Env overrides:
 #   NPU_VENV_SOURCE  - venv to copy from (default: .venv, then spectral-mask-resampling/.venv)
 #   NPU_VENDOR_DIR   - target dir (default: .pydeps_npu)
@@ -31,6 +33,22 @@ all_present() {
     fi
   done
   return 0
+}
+
+numpy_ok_for_npu() {
+  PYTHONNOUSERSITE=1 PYTHONPATH="${VENDOR}${PYTHONPATH:+:$PYTHONPATH}" \
+    "$PY" -c "import numpy as np; major=int(np.__version__.split('.')[0]); assert major < 2, np.__version__"
+}
+
+strip_acl_conflicting_pkgs() {
+  # Vendored NumPy 2.x shadows container NumPy 1.x and breaks Ascend (np.float_ removed).
+  [[ -d "$VENDOR" ]] || return 0
+  local item
+  for item in "$VENDOR"/numpy "$VENDOR"/numpy-*.dist-info "$VENDOR"/numpy.libs \
+              "$VENDOR"/scipy "$VENDOR"/scipy-*.dist-info; do
+    [[ -e "$item" ]] || continue
+    rm -rf "$item"
+  done
 }
 
 resolve_venv() {
@@ -75,6 +93,11 @@ rsync_excludes=(
   --exclude 'wheel-*.dist-info/'
   --exclude '_distutils_hack/'
   --exclude '_virtualenv*'
+  --exclude 'numpy/'
+  --exclude 'numpy-*.dist-info/'
+  --exclude 'numpy.libs/'
+  --exclude 'scipy/'
+  --exclude 'scipy-*.dist-info/'
 )
 
 should_skip_vendor_item() {
@@ -87,6 +110,9 @@ should_skip_vendor_item() {
       return 0
       ;;
     nvidia_*)
+      return 0
+      ;;
+    numpy|numpy-*|numpy.libs|scipy|scipy-*)
       return 0
       ;;
   esac
@@ -130,6 +156,8 @@ copy_from_venv() {
     copy_tree_fallback "$src"
   fi
 
+  strip_acl_conflicting_pkgs
+
   venv_py="$("$venv/bin/python" -V 2>&1)"
   container_py="$(PYTHONNOUSERSITE=1 "$PY" -V 2>&1 || true)"
   {
@@ -141,8 +169,9 @@ copy_from_venv() {
 }
 
 export_vendor_path
+strip_acl_conflicting_pkgs
 
-if all_present; then
+if all_present && numpy_ok_for_npu; then
   echo "NPU python deps OK in $VENDOR (skip copy)"
   return 0 2>/dev/null || exit 0
 fi
@@ -150,8 +179,13 @@ fi
 copy_from_venv
 export_vendor_path
 
-if ! all_present; then
+if ! all_present || ! numpy_ok_for_npu; then
   echo "ERROR: deps copied but imports still fail on container python." >&2
+  if ! numpy_ok_for_npu 2>/dev/null; then
+    echo "  NumPy must be 1.x from the container (Ascend breaks on NumPy 2.x)." >&2
+    PYTHONNOUSERSITE=1 PYTHONPATH="${VENDOR}${PYTHONPATH:+:$PYTHONPATH}" \
+      "$PY" -c "import numpy as np; print('numpy', np.__version__, np.__file__)" 2>&1 || true
+  fi
   echo "  Ensure venv Python matches container (e.g. 3.10) and requirements are installed:" >&2
   echo "    cd $ROOT && source .venv/bin/activate && pip install -r requirements.txt" >&2
   echo "    bash scripts/ensure_npu_deps.sh python3" >&2
