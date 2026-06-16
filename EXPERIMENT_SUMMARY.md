@@ -40,7 +40,8 @@ python jpeg_resample_detector.py --image IMG --null_dir dataset_x8/original
 python evaluate_detector_on_dataset.py --detector jpeg_resample_detector.py --dataset_root dataset_x8 --split test --null_dir dataset_x8/train/original
 ```
 
-zzy 分支的 NFA 候选尺寸估计（`resampling_core.py` + RAISE100 受控实验）见 [`README.md`](README.md) 路线 A1。
+zzy 分支的 NFA 候选尺寸估计（`resampling_core.py` + RAISE100 受控实验）见 [`README.md`](README.md) 路线 A1。  
+**W3 先导实验**（`main` 分支 `pilots/`、10 张 RAISE 结论）见 [`REPORT.zh.md`](REPORT.zh.md) 与 `data/pilot_results/PILOT_SUMMARY.md`。
 
 ---
 

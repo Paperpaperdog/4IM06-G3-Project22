@@ -6,7 +6,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 
 | 路线 | 分支来源 | 目录 / 入口 | 侧重点 |
 |------|----------|-------------|--------|
-| **A. 经典检测** | `zzy_raise100_resized_dataset` + `test` | 根目录 `.py` | NFA 谱相关 + 候选尺寸估计；**JPEG vs ×8 重采样** a contrario 判别 |
+| **A. 经典检测** | `main` + `zzy_raise100_resized_dataset` + `test` | 根目录 `.py`、`pilots/` | W3 先导实验；NFA 复现；JPEG vs ×8 判别 |
 | **B. 可学习 Mask** | `zzy_raise100_resized_dataset`（代码）+ `xby-branch`（结果） | `spectral-mask-resampling/` | 频域重采样 + 每类 mask/reference；JPEG vs ×8/×16 歧义 |
 | **C. 频谱 CNN** | `xby-branch` | `CNN/spectral-history-cnn/` | 位置编码 CNN；处理历史多类分类 |
 
@@ -16,6 +16,33 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 ---
 
 ## 路线 A：经典重采样 / 压缩检测
+
+### A0. W3 先导实验（`main` 分支）
+
+> 早期经典复现 + 两条 pilot 思路，直接调用根目录 `resampling_core.py`。
+
+| 文件 | 说明 |
+|------|------|
+| `run_pilots.py` | 一键跑通：子集准备 → Idea 1 → Idea 2 → 对比汇总 |
+| `pilots/idea1_jpeg.py` | **Idea 1**：JPEG / ×8 / ×16 周期混淆（固定 384×384） |
+| `pilots/idea2_k_groups.py` | **Idea 2**：k∈{-1,0,1} 参考尺寸分组 + 峰形指标 |
+| `pilots/prepare_subset.py` | RAISE TIFF → PNG 子集 + `data/manifest.csv` |
+| `pilots/compare.py` | 汇总 Idea 1/2 的 CSV，生成 `PILOT_SUMMARY.md` |
+| `data/pilot_results/PILOT_SUMMARY.md` | 已跑通的 10 张 RAISE 先导结论（中文） |
+| `REPORT.zh.md` | 完整中文实验报告 |
+
+```bash
+# 小规模先导（默认最多 5 张图，可 --download 从 RAISE_1k.csv 拉 TIFF）
+python run_pilots.py --max-images 5
+
+# 分步运行
+python -m pilots.prepare_subset --max-images 5
+python -m pilots.idea1_jpeg
+python -m pilots.idea2_k_groups
+python -m pilots.compare
+```
+
+**主要结论**（详见 `data/pilot_results/PILOT_SUMMARY.md`）：在 384px 目标上，纯 PNG 重采样与未重采样 **峰值距离不可分**；JPEG 与栅格模拟信号强但不稳定；k 分组未提供可操作判别力 → 促使后续 Mask/CNN 路线。
 
 ### A1. 模块化 NFA 管线（`zzy_raise100_resized_dataset`）
 
@@ -166,8 +193,9 @@ bash scripts/run_v1_pipeline_full.sh
 
 | 原分支 | 本仓库中的保留 |
 |--------|----------------|
+| `main` | W3 先导实验 `pilots/`、`run_pilots.py`、`REPORT.zh.md`、先导结果摘要 |
 | `xby-branch` | CNN 管线、Mask 实验结果、`EXPERIMENT_SUMMARY.md` |
 | `zzy_raise100_resized_dataset` | Mask 源码、RAISE 受控数据集管线、NFA 核心实现 |
-| `test` | **JPEG vs ×8 重采样三脚本管线**（`create_forensic_postprocess_dataset.py`、`jpeg_resample_detector.py`、`evaluate_detector_on_dataset.py`）；早期工具见 A3 |
+| `test` | **JPEG vs ×8 重采样三脚本管线**；早期工具见 A3 |
 
 整合分支：`project-integration`

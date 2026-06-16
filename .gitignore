@@ -6,8 +6,16 @@ __pycache__/
 .matplotlib-cache/
 .DS_Store
 
-# Data / outputs
-data/
+# Data / outputs (see data/.gitignore for pilot result rules)
+data/raise_png/
+data/generated/
+data/images_png/
+data/images_tif/
+data/protocol_dataset/
+data/RAISE_1k.csv
+data/raise_raw/tiff/
+data/raise_raw/*.tif
+data/raise_raw/*.TIF
 */data/
 outputs/
 logs/
