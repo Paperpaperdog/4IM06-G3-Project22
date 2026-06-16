@@ -37,5 +37,16 @@ runs/
 *.tar.gz
 *.zip
 
-# Large local project
-spectral-mask-resampling/
+# Large local project (track only clean-run summaries under outputs/)
+spectral-mask-resampling/*
+!spectral-mask-resampling/outputs/
+spectral-mask-resampling/outputs/*
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/*.json
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/*.csv
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/*.png
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/*.png
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/confusion_matrix_by_observed_size/
+!spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/confusion_matrix_by_observed_size/*.png

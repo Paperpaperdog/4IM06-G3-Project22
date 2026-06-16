@@ -1,6 +1,6 @@
 # 实验梳理与结果分析
 
-> 更新日期：2026-06-17  
+> 更新日期：2026-06-16  
 > 涵盖两条主线：**Mask**（`spectral-mask-resampling`）与 **CNN**（`spectral-history-cnn`）
 
 ---
@@ -48,16 +48,19 @@ flowchart TB
 | 频谱尺寸 | 统一插值到 **512×257**（cycles/pixel 归一化网格） | 原生 **64×33** |
 | 模型 | 每类一个 mask \(M_k\) + reference \(R_k\)，sigmoid mask 后与谱做 cosine similarity | 轻量 CNN + 正弦位置编码（λ=1,2,4,8,16,32） |
 | 科学侧重 | JPEG vs ×8/×16 **歧义**（Fourier-only 能否分开） | 处理历史分类 + 混淆模式分析 |
-| 结果文件 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask*/` | `CNN/spectral-history-cnn/outputs/metrics_test.json` 等 |
+| 结果文件 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/` | `CNN/spectral-history-cnn/outputs/metrics_test.json` 等 |
 | 测试集规模 | **20000**（每类 5000，含 5 种观测尺寸） | **9000**（每类 1500，固定 64×64） |
 
 ---
 
 ## 三、Mask 路线：实验内容与结果
 
-### 3.1 实验设计（`v1_fourier_ambiguity_mask`）
+> **唯一保留版本**：`v1_fourier_ambiguity_mask_clean`  
+> 结果目录：`spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/`
 
-针对 `SUIVI.md` 里提到的 **resampling ambiguity**：
+### 3.1 实验设计
+
+针对 **resampling ambiguity**（Fourier 歧义）：
 
 - 不同原始尺寸经不同路径，可能落到同一目标尺寸，频谱峰值位置相似
 - Mask 路线用**频域重采样**（不是图像域放大）：把不同尺寸的 log-rFFT 谱映射到同一 **512×257** 归一化频率网格，再比较
@@ -68,6 +71,8 @@ flowchart TB
 - `JPEG_Q80`：裁 \(o \times o\) 后 JPEG Q=80
 - `downsample_x8`：裁 \(8o \times 8o\) → resize 到 \(o\)
 - `downsample_x16`：裁 \(16o \times 16o\) → resize 到 \(o\)
+
+观测尺寸：**128, 96, 64, 48, 32**（每类每尺寸 1000 样本，测试集共 **20000**）
 
 预处理流水线：
 
@@ -82,17 +87,16 @@ RGB → Y 通道 → TV residual → rFFT2 → 垂直 fftshift
 - 每类一个可学习 mask \(M_k\)（sigmoid）和一个 reference 谱 \(R_k\)
 - 对输入谱做 per-sample 归一化后，用 mask 加权，再与 reference 算 cosine similarity 得到 logits
 
-### 3.2 三个变体对比（测试集 20000 样本）
+### 3.2 总体指标
 
-结果目录：`spectral-mask-resampling/outputs/`
+| 指标 | 数值 |
+|------|------|
+| **测试准确率** | **56.6%** |
+| **Macro F1** | **0.561** |
+| 测试样本数 | 20000（4 类 × 5000） |
+| 随机基线（4 类） | 25% |
 
-| 变体 | 总体准确率 | macro F1 | 推荐 |
-|------|-----------|----------|------|
-| **v1_fourier_ambiguity_mask_clean** | **56.6%** | **0.561** | ✅ 最佳 |
-| `v1_fourier_ambiguity_mask` | 55.9% | 0.554 | 与 clean 接近 |
-| `v1_fourier_ambiguity_mask_fast` | 41.6% | 0.380 | ❌ 退化 |
-
-### 3.3 最佳变体分类指标（`v1_fourier_ambiguity_mask_clean`）
+### 3.3 分类指标（按类）
 
 | 类别 | Precision | Recall | F1 | AUC (OvR) |
 |------|-----------|--------|-----|-----------|
@@ -101,13 +105,35 @@ RGB → Y 通道 → TV residual → rFFT2 → 垂直 fftshift
 | downsample×8 | 0.48 | 0.42 | **0.45** | 0.78 |
 | downsample×16 | 0.52 | 0.50 | **0.51** | 0.82 |
 
-**按观测尺寸的准确率**（尺寸越小越难）：
+![Per-class F1 and AUC](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/per_class_metrics.png)
+
+### 3.4 按观测尺寸的准确率
+
+尺寸越小，频谱信息越少，分类越难：
 
 | 观测尺寸 | 128 | 96 | 64 | 48 | 32 |
 |----------|-----|-----|-----|-----|-----|
 | accuracy | 63.3% | 60.9% | 56.9% | 54.2% | 47.6% |
 
-### 3.4 关键混淆（clean 版，每类 support=5000）
+![Accuracy vs observed size](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/accuracy_by_size.png)
+
+各尺寸混淆矩阵见 `figures/confusion_matrix_by_observed_size/`（如 `confusion_matrix_observed_size_48.png`）。
+
+### 3.5 混淆矩阵与关键错误
+
+原始计数混淆矩阵（行=真实，列=预测）：
+
+```text
+              pred_orig  pred_JPEG  pred_x8  pred_x16
+true_orig        2900       1515      278       307
+true_JPEG         833       3775      298        94
+true_x8           611        365     2122      1902
+true_x16          461        261     1762      2516
+```
+
+![Overall confusion matrix](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/confusion_matrix.png)
+
+![Row-normalized confusion matrix](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/confusion_matrix_normalized.png)
 
 | 混淆对 | 数量 | 结论 |
 |--------|------|------|
@@ -118,30 +144,37 @@ RGB → Y 通道 → TV residual → rFFT2 → 垂直 fftshift
 | **×8 → ×16** | **1902** | **最严重**（占 ×8 样本 38%） |
 | **×16 → ×8** | **1762** | **最严重**（占 ×16 样本 35%） |
 
-混淆矩阵（行=真实，列=预测）：
+![Key confusion pairs](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/key_confusion_pairs.png)
 
-```text
-              pred_orig  pred_JPEG  pred_x8  pred_x16
-true_orig        2900       1515      278       307
-true_JPEG         833       3775      298        94
-true_x8           611        365     2122      1902
-true_x16          461        261     1762      2516
+### 3.6 可解释性：learned mask 与频谱
+
+四类 learned mask 在频域上**高度重叠**（非对角 overlap 均值 **0.936**），模型未能为各类划出独立频带——与 ×8/×16 严重混淆一致。
+
+![Learned masks](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/learned_masks.png)
+
+![Mask overlap heatmap](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/mask_overlap_heatmap.png)
+
+![Mean spectra per class](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/mean_spectra.png)
+
+各类预测概率分布（真类 ×8/×16 时，模型对 ×16/×8 概率接近，体现歧义）：
+
+![Probability distribution by true class](spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/figures/summary/prob_distribution_by_true_class.png)
+
+### 3.7 结果分析
+
+1. **总体准确率约 56.6%**，明显高于随机（25%），但 Fourier-only mask 仍难以可靠区分全部 4 类。
+2. **核心瓶颈是 ×8 ↔ ×16**：两类互相误判合计 3664 例，印证 Fourier ambiguity——8 与 16 周期痕迹在频域难以区分。
+3. **original ↔ JPEG 混淆显著**（1515+833）：未压缩图与 JPEG 的频谱也比预期更接近。
+4. **JPEG vs ×8/×16 并非完全分不清**：JPEG→×8 仅 298、JPEG→×16 仅 94。
+5. **观测尺寸影响大**：128→32 准确率从 63.3% 降至 47.6%。
+6. **高 mask overlap（0.936）** 本身是有价值的负结果——支持后续加 DCT 量化证据等混合方案。
+
+重新生成图表：
+
+```bash
+python spectral-mask-resampling/scripts/plot_mask_results.py
 ```
 
-### 3.5 Mask 频带可分离性（早期 overlap 分析）
-
-此前从 checkpoint 导出的 learned mask 分析显示，四类 mask 在频域上**高度重叠**（clean 版非对角 overlap 均值 0.936，fast 版≈0.999 塌缩）。这与分类结果一致：模型未能为各类划出独立频带。
-
-### 3.6 Mask 结果分析
-
-1. **总体准确率约 56%**，略高于随机（25%），但远低于 CNN 6 类实验的 62.5%（注意两者测试协议不同：Mask 含多尺寸、20000 样本）。
-2. **核心瓶颈是 ×8 ↔ ×16**：两类互相误判合计 3664 例，印证 Fourier ambiguity——8 与 16 周期痕迹在频域难以区分。
-3. **original ↔ JPEG 混淆显著**（1515+833）：Mask 路线下未压缩图与 JPEG 的频谱也比预期更接近。
-4. **JPEG vs ×8/×16 并非完全分不清**：JPEG→×8 仅 298、JPEG→×16 仅 94，但 ×8/×16 之间混淆极严重。
-5. **观测尺寸影响大**：128→32 准确率从 63.3% 降至 47.6%，小尺寸下频谱信息更少。
-6. **fast 版明显退化**（41.6%）：大量 original 被误判为 JPEG（3038/5000），与 mask 塌缩现象一致。
-
-这与 README 预期一致：即使准确率不高，**高 mask overlap + ×8/×16 混淆**本身就是有价值的结果——支持后续加 DCT 量化证据等混合方案（README Version 4）。
 
 ---
 
@@ -198,7 +231,7 @@ true_x16          461        261     1762      2516
 
 ## 五、两条路线的对比与启示
 
-| 问题 | Mask（clean，4 类） | CNN（6 类，固定 64） |
+| 问题 | Mask（`v1_fourier_ambiguity_mask_clean`，4 类） | CNN（6 类，固定 64） |
 |------|---------------------|----------------------|
 | 总体准确率 | **56.6%** | **62.5%** |
 | original / JPEG | F1≈0.59 / 0.69 | F1≈0.91 / 0.91 |
@@ -210,7 +243,7 @@ true_x16          461        261     1762      2516
 
 **综合判断**：
 
-- **Mask（56.6%）**：Fourier-only 可学习 mask 在 4 类歧义任务上仅略优于随机；**×8/×16 互相混淆是首要问题**，original/JPEG 次之。多尺寸设定使任务更难。
+- **Mask（56.6%）**：Fourier-only 可学习 mask 在 4 类歧义任务上优于随机；**×8/×16 互相混淆是首要问题**，original/JPEG 次之。多尺寸设定使任务更难。
 - **CNN（62.5%）**：深度模型在 original/JPEG 上远强于 Mask；6 类设定下主要瓶颈是 ×4/×8/×16 倍率细分，而非 JPEG ambiguity。
 - 两条线**任务设定尚未完全对齐**（Mask=4 类+多尺寸+20000 样本，CNN=6 类+固定 64+9000 样本）。下一步应跑通 **4 类 CNN**，并在相同 4 类条件下公平对比。
 
@@ -227,12 +260,11 @@ true_x16          461        261     1762      2516
 
 ## 七、当前缺口与建议下一步
 
-1. ~~补 Mask 分类指标~~ ✅ 已完成（`spectral-mask-resampling/outputs/*/metrics.json`）。
+1. ~~补 Mask 分类指标与可视化~~ ✅ 已完成（`v1_fourier_ambiguity_mask_clean`）。
 2. **跑完 4 类 CNN**（`v1_final64_poscnn4`），与 Mask 同任务对比。
 3. **CNN early stopping**：用 val 最佳 epoch（≈5）而非 epoch 50。
-4. **导出 Mask learned mask 可视化**到 outputs（`masks.npy`、`mask_overlap.npy`），便于与分类指标对照。
-5. **报告里分开写两类结论**：
-   - Mask：分类准确率 + 频带可分离性（mask overlap）+ per-size 分析
+4. **报告里分开写两类结论**：
+   - Mask：分类准确率 + 频带可分离性（mask overlap）+ per-size 分析 + 图表（`figures/summary/`）
    - CNN：分类性能 + 混淆结构
 
 ---
@@ -241,10 +273,12 @@ true_x16          461        261     1762      2516
 
 | 内容 | 路径 |
 |------|------|
-| Mask 最佳结果 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/metrics.json` |
-| Mask 三变体 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask{,_clean,_fast}/` |
-| Mask 预测明细 | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/predictions_test.csv` |
-| Mask zip 对比脚本 | `CNN/spectral-history-cnn/scripts/compare_mask_zip.py` |
+| Mask 结果（唯一版本） | `spectral-mask-resampling/outputs/v1_fourier_ambiguity_mask_clean/` |
+| Mask 指标 | `.../metrics.json` |
+| Mask 预测明细 | `.../predictions_test.csv` |
+| Mask 汇总图表 | `.../figures/summary/*.png` |
+| Mask 按尺寸混淆矩阵 | `.../figures/confusion_matrix_by_observed_size/` |
+| Mask 绘图脚本 | `spectral-mask-resampling/scripts/plot_mask_results.py` |
 | CNN 测试指标 | `CNN/spectral-history-cnn/outputs/metrics_test.json` |
 | CNN 训练曲线 | `CNN/spectral-history-cnn/outputs/train_log.csv` |
 | CNN 4 类配置 | `CNN/spectral-history-cnn/configs/v1_final64_poscnn_local.yaml` |
