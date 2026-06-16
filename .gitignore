@@ -28,3 +28,6 @@ spectral-mask-resampling/**/__pycache__/
 spectral-mask-resampling/.DS_Store
 spectral-mask-resampling/.venv/
 spectral-mask-resampling/.matplotlib-cache/
+
+# temp artifacts
+**/.__dpc*
