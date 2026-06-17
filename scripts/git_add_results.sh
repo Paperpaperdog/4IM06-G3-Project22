@@ -40,7 +40,6 @@ while IFS= read -r -d '' file; do
     continue
   fi
   if git check-ignore -q "$rel" 2>/dev/null; then
-    # Still allow force-add for checkpoints if under size limit
     case "$rel" in
       results/*/checkpoints/*.pt|results/*/*/checkpoints/*.pt)
         if (( DO_ADD )); then
@@ -50,8 +49,17 @@ while IFS= read -r -d '' file; do
         added=$((added + 1))
         ;;
       *)
-        echo "SKIP ignored: $rel"
-        skipped_ignore=$((skipped_ignore + 1))
+        # figures/ may stay ignored until .gitignore is pulled; force-add png under size limit
+        if [[ "$rel" =~ ^results/.+/figures/ ]] && [[ "$rel" == *.png ]]; then
+          if (( DO_ADD )); then
+            git add -f "$rel"
+          fi
+          echo "ADD (force) $rel ($size_h)"
+          added=$((added + 1))
+        else
+          echo "SKIP ignored: $rel"
+          skipped_ignore=$((skipped_ignore + 1))
+        fi
         ;;
     esac
   else

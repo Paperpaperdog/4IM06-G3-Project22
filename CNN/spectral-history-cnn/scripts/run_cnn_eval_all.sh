@@ -22,7 +22,7 @@ for size in $SIZES; do
     continue
   fi
   echo "=== CNN eval size=$size (CPU, local) ==="
-  CONFIG="$cfg" DEVICE=cpu bash "$ROOT/scripts/run_v1_eval_cpu.sh"
+  CONFIG="$cfg" DEVICE=cpu SKIP_VISUALIZE="${SKIP_VISUALIZE:-1}" bash "$ROOT/scripts/run_v1_eval_cpu.sh"
 done
 
 echo "Done. Check: ls $ROOT/../../results/cnn/n6_poscnn_size*/metrics.json"

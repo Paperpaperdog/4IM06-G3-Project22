@@ -7,9 +7,8 @@ __pycache__/
 .DS_Store
 
 # Unified results tree (results/<method>/...): ignore by default; track lightweight
-# artifacts (metrics, logs, configs, comparison plots). Checkpoints (*.pt) stay
-# ignored globally — use scripts/git_add_results.sh to force-add any result file
-# under the size limit (default 50MB).
+# artifacts (metrics, logs, configs, figures, comparison plots). Checkpoints (*.pt)
+# stay ignored globally — use scripts/git_add_results.sh to force-add under 50MB.
 results/**
 !results/**/
 !results/**/metrics.json
@@ -19,6 +18,8 @@ results/**
 !results/**/logs/
 !results/**/logs/**
 !results/**/predictions*.csv
+!results/**/figures/
+!results/**/figures/**
 !results/comparison/
 !results/comparison/**
 

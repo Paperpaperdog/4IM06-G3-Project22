@@ -126,6 +126,8 @@ def main() -> None:
     parser.add_argument("--device", default=None)
     parser.add_argument("--examples-per-class", type=int, default=8)
     parser.add_argument("--saliency-per-class", type=int, default=128)
+    parser.add_argument("--num-workers", type=int, default=None,
+                        help="DataLoader workers (default: 0 on cpu, else config value)")
     args = parser.parse_args()
 
     reject_legacy_config_path(args.config)
@@ -144,8 +146,12 @@ def main() -> None:
     processed_dir = Path(config["paths"]["processed_dir"])
     figures_dir = ensure_dir(Path(config["paths"]["output_dir"]) / "figures")
     dataset = SpectraDataset(processed_dir, args.split)
+    num_workers = args.num_workers
+    if num_workers is None:
+        num_workers = 0 if str(device).type == "cpu" else int(config["training"]["num_workers"])
 
     save_mean_and_example_spectra(dataset, class_names, figures_dir, args.examples_per_class)
+    print(f"Computing saliency maps (num_workers={num_workers}, may take several minutes on CPU)...")
     save_gradient_saliency(
         model,
         dataset,
@@ -153,7 +159,7 @@ def main() -> None:
         figures_dir,
         device,
         batch_size=int(config["training"]["batch_size"]),
-        num_workers=int(config["training"]["num_workers"]),
+        num_workers=num_workers,
         max_per_class=int(args.saliency_per_class),
     )
     print(f"Saved figures under {figures_dir}")

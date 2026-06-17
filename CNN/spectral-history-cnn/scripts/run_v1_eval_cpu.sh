@@ -51,11 +51,14 @@ log "python=$PY"
   --checkpoint "$CKPT" \
   --split "$SPLIT" 2>&1 | tee -a "$LOG_FILE"
 
-if "$PY" src/visualize.py \
+if [[ "${SKIP_VISUALIZE:-0}" == "1" ]]; then
+  log "SKIP_VISUALIZE=1 (metrics-only)"
+elif "$PY" src/visualize.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
   --checkpoint "$CKPT" \
-  --split "$SPLIT" 2>&1 | tee -a "$LOG_FILE"; then
+  --split "$SPLIT" \
+  --num-workers 0 2>&1 | tee -a "$LOG_FILE"; then
   log "visualize OK"
 else
   log "WARN: visualize skipped (metrics already saved)"
