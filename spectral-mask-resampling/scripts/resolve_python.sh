@@ -19,15 +19,15 @@ resolve_cpu() {
     echo "Using PYTHON=$PYTHON (cpu/prepare)"
     return 0
   fi
-  # Search order: explicit VENV_DIR, local .venv, sibling checkout without
-  # "-integration" (common on this cluster), CNN fallback venv.
+  # spectral-mask-resampling and CNN/spectral-history-cnn are siblings under the repo root.
+  local cnn_root="${CNN_ROOT:-$ROOT/../CNN/spectral-history-cnn}"
   local legacy_root="${ROOT/-integration/}"
   local -a _venv_candidates=()
   [[ -n "${VENV_DIR:-}" ]] && _venv_candidates+=("$VENV_DIR")
   _venv_candidates+=(
     "$ROOT/.venv"
     "$legacy_root/.venv"
-    "$ROOT/../../CNN/spectral-history-cnn/.venv"
+    "$cnn_root/.venv"
   )
   for v in "${_venv_candidates[@]}"; do
     [[ -n "$v" ]] || continue
@@ -61,9 +61,11 @@ resolve_npu() {
   export PYTHONNOUSERSITE=1
   export DEVICE=npu
 
-  local activate="$ROOT/../../CNN/spectral-history-cnn/scripts/activate_python.sh"
+  local cnn_root="${CNN_ROOT:-$ROOT/../CNN/spectral-history-cnn}"
+  local activate="$cnn_root/scripts/activate_python.sh"
   if [[ ! -f "$activate" ]]; then
     echo "ERROR: CNN activate_python.sh not found: $activate" >&2
+    echo "  Set CNN_ROOT to .../CNN/spectral-history-cnn and retry." >&2
     return 1
   fi
   # shellcheck disable=SC1091
