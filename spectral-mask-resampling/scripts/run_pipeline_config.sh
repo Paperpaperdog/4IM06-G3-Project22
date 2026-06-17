@@ -16,7 +16,6 @@ export PYTHONUNBUFFERED=1
 
 CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/u6_mask_size64.yaml}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
-PY="${PYTHON:-python3}"
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
@@ -24,28 +23,34 @@ TS="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOG_DIR/mask_pipeline_${TS}.log"
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"; }
 
-# Source shared Ascend env when training on NPU (reuses the CNN plumbing).
-DEVICE_NAME="$("$PY" -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['training']['device'])")"
-if [[ "$DEVICE_NAME" == "npu" ]]; then
-  export PYTHONNOUSERSITE=1
-  NPU_ENV="$ROOT/../../CNN/spectral-history-cnn/scripts/setup_npu_env.sh"
-  if [[ -f "$NPU_ENV" ]]; then
-    # shellcheck disable=SC1091
-    source "$NPU_ENV" >> "$LOG_FILE" 2>&1 || true
-  fi
-fi
-
-OUTPUT_DIR="$("$PY" -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['output_dir'])")"
-CKPT="$OUTPUT_DIR/checkpoints/best.pt"
+DEVICE_NAME="$(python3 -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['training']['device'])" 2>/dev/null || echo npu)"
 
 log "=== mask pipeline start ==="
-log "CONFIG=$CONFIG DEVICE=$DEVICE_NAME OUTPUT_DIR=$OUTPUT_DIR SKIP_PREPARE=$SKIP_PREPARE"
+log "CONFIG=$CONFIG DEVICE=$DEVICE_NAME SKIP_PREPARE=$SKIP_PREPARE"
 
 if [[ "$SKIP_PREPARE" != "1" ]]; then
-  CONFIG="$CONFIG" bash "$ROOT/scripts/run_prepare_config.sh" 2>&1 | tee -a "$LOG_FILE"
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/resolve_python.sh" cpu
+  PREP_PY="${PYTHON:-python3}"
+  log "prepare python: $PREP_PY"
+  CONFIG="$CONFIG" PYTHON="$PREP_PY" bash "$ROOT/scripts/run_prepare_config.sh" 2>&1 | tee -a "$LOG_FILE"
 else
   log "SKIP_PREPARE=1, using existing cache"
 fi
+
+if [[ "$DEVICE_NAME" == "npu" ]]; then
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/resolve_python.sh" npu
+else
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/resolve_python.sh" cpu
+fi
+PY="${PYTHON:-python3}"
+log "train/eval python: $PY"
+
+OUTPUT_DIR="$("$PY" -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['output_dir'])")"
+CKPT="$OUTPUT_DIR/checkpoints/best.pt"
+log "OUTPUT_DIR=$OUTPUT_DIR"
 
 log "train"
 "$PY" src/train.py --config "$CONFIG" 2>&1 | tee -a "$LOG_FILE"

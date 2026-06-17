@@ -13,8 +13,13 @@
 # running the worker directly (use that on an already-allocated NPU node).
 set -euo pipefail
 
-# Cluster checkout root for this repo (adjust if yours differs).
-REPO_ROOT="${REPO_ROOT:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes/4IM06-G3-Project22}"
+# Cluster checkout root for this repo. submit_size_sweep_npu.sh passes REPO_ROOT
+# automatically; override only if you invoke this wrapper by hand.
+REPO_ROOT="${REPO_ROOT:-}"
+if [[ -z "$REPO_ROOT" ]]; then
+  # Fallback when run directly without submit script (edit to your checkout).
+  REPO_ROOT="${HOME}/Codes/4IM06-G3-Project22-integration"
+fi
 MASK_ROOT="$REPO_ROOT/spectral-mask-resampling"
 WORKER="$MASK_ROOT/scripts/vc_worker.sh"
 

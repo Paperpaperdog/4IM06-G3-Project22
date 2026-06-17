@@ -11,6 +11,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Project root (parent of spectral-mask-resampling/). Passed to vc_mask_u6.sh so the
+# cluster wrapper finds vc_worker.sh even when the checkout is named e.g.
+# 4IM06-G3-Project22-integration instead of 4IM06-G3-Project22.
+REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/.." && pwd)}"
 CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
 VC_WRAPPER="${VC_WRAPPER:-vc_mask_u6.sh}"
 SIZES="${SIZES:-32 64 96 128}"
@@ -34,8 +38,9 @@ for size in $SIZES; do
     echo "SKIP: missing config $ROOT/$cfg" >&2
     continue
   fi
-  echo "=== submit mask size=$size config=$cfg ==="
+  echo "=== submit mask size=$size config=$cfg REPO_ROOT=$REPO_ROOT ==="
   cd "$CODES"
+  REPO_ROOT="$REPO_ROOT" \
   CONFIG="$cfg" \
   SKIP_PREPARE="$SKIP_PREPARE" \
   JOB="mask_u6_size${size}" \
