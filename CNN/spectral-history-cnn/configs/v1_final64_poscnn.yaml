@@ -1,4 +1,4 @@
-experiment_name: v1_final64_poscnn4
+experiment_name: v1_final64_poscnn8_updown
 
 paths:
   # Relative to this project root. The CSV contains RAISE TIFF URLs.
@@ -6,8 +6,8 @@ paths:
   raise_dir: null
   image_cache_dir: data/raw/raise_tiff
   split_json: data/splits/raise_split_seed123.json
-  processed_dir: data/processed/v1_final64_tv_rfft_4cls
-  output_dir: outputs/v1_final64_poscnn4
+  processed_dir: data/processed/v1_final64_tv_rfft_8cls_updown
+  output_dir: outputs/v1_final64_poscnn8_updown
 
 data:
   final_size: 64
@@ -16,6 +16,10 @@ data:
     - JPEG
     - downsample_x8
     - downsample_x16
+    - upsample_x2
+    - upsample_x4
+    - upsample_x8
+    - upsample_x16
   train_images: 700
   val_images: 150
   test_images: 150
@@ -51,7 +55,7 @@ positional_encoding:
 model:
   name: spectral_positional_cnn
   input_channels: 44
-  num_classes: 4
+  num_classes: 8
   dropout: 0.2
 
 training:
