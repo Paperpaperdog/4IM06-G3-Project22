@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# CNN prepare step: use the shared spectrum cache (built once for Mask + CNN).
 set -euo pipefail
 
 ROOT="${CNN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -7,52 +8,32 @@ cd "$ROOT"
 export PYTHONPATH=.
 export CNN_ROOT="$ROOT"
 
+CONFIG="${CONFIG:-configs/size_sweep/n6_poscnn_size64.yaml}"
+repo_root="$(cd "$ROOT/../.." && pwd)"
+
+if [[ ! -f "$ROOT/$CONFIG" ]]; then
+  echo "ERROR: config not found: $ROOT/$CONFIG" >&2
+  exit 1
+fi
+
 # shellcheck disable=SC1091
 if [[ -z "${PREP_PY:-}" ]]; then
   source "$ROOT/scripts/resolve_prepare_python.sh"
 else
   echo "Using prepare python (inherited): $PREP_PY"
 fi
+PY="${PREP_PY:-python3}"
 
-CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
-repo_root="$(cd "$ROOT/../.." && pwd)"
-RAISE_DIR="${RAISE_DIR:-$repo_root/spectral-mask-resampling/data/raw/raise_tiff}"
-if [[ ! -d "$RAISE_DIR" && -d "${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then
-  RAISE_DIR="${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
-fi
-export RAISE_DIR
-SPLIT_JSON="${SPLIT_JSON:-data/splits/raise_split_seed123_local.json}"
+PROCESSED_DIR="$("$PY" -c "import yaml; from pathlib import Path; p=yaml.safe_load(open('$CONFIG'))['paths']['processed_dir']; print(Path('$ROOT')/p)")"
+PROCESSED_DIR="$(cd "$(dirname "$PROCESSED_DIR")" && pwd)/$(basename "$PROCESSED_DIR")"
 
-if [[ ! -f "$ROOT/$CONFIG" ]]; then
-  echo "ERROR: config not found: $ROOT/$CONFIG" >&2
-  echo "  CNN_ROOT=$ROOT" >&2
-  exit 1
+if [[ -f "$PROCESSED_DIR/train_spectra.npy" && -f "$PROCESSED_DIR/test_spectra.npy" ]]; then
+  echo "Shared spectrum cache OK: $PROCESSED_DIR"
+  echo "  (Mask and CNN use the same files — no second preprocess needed)"
+  exit 0
 fi
 
-RAISE_DIR="$(cd "$RAISE_DIR" && pwd)"
-
-if [[ ! -d "$RAISE_DIR" ]]; then
-  echo "ERROR: RAISE TIFF directory not found: $RAISE_DIR" >&2
-  exit 1
-fi
-
-tiff_count="$(find "$RAISE_DIR" -maxdepth 1 -iname '*.tif' | wc -l)"
-echo "Using local RAISE cache: $RAISE_DIR ($tiff_count TIFF files)"
-
-mkdir -p data/splits
-
-"$PREP_PY" src/data/split_raise.py \
-  --input-dir "$RAISE_DIR" \
-  --output-json "$SPLIT_JSON" \
-  --train 700 \
-  --val 150 \
-  --test 150 \
-  --seed 123
-
-"$PREP_PY" src/data/preprocess_spectra.py \
-  --config "$CONFIG" \
-  --raise-dir "$RAISE_DIR" \
-  --image-cache-dir "$RAISE_DIR" \
-  --split-json "$SPLIT_JSON" \
-  --workers "${WORKERS:-32}" \
-  ${LIMIT_SAMPLES:+--limit-samples "$LIMIT_SAMPLES"}
+echo "Shared cache missing at: $PROCESSED_DIR"
+SIZE="$("$PY" -c "import yaml; print(yaml.safe_load(open('$CONFIG'))['data']['final_size'])")"
+echo "Building via scripts/prepare_n6_spectra.sh (SIZE=$SIZE) ..."
+SIZE="$SIZE" exec bash "$repo_root/scripts/prepare_n6_spectra.sh"

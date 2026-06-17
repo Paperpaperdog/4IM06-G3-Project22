@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Replace broken RAISE TIFF entries in sample_list.csv with valid RAISE-2k images."""
+"""Replace broken RAISE TIFF entries in sample_list.csv with valid RAISE-2k images.
+
+Legacy utility for the old RAISE-1000-ms ``sample_list.csv`` workflow (v1 mask
+data curation). **Not used** in the n6 main experiment path (see
+``docs/EXPERIMENT_RUNBOOK.md`` — split comes from ``split_raise.py``).
+
+Quality checks use a fixed 512×512 RGB crop and the **native** log-rFFT spectrum
+at that resolution (512×257), matching the current ``spectrum.py`` API.
+"""
 
 from __future__ import annotations
 
@@ -98,12 +106,7 @@ def count_zero_spectra(image: Image.Image, seed: int, patches: int) -> int:
                 processed = resize_pil(patch, side, "bicubic")
             y = rgb_to_y_float(processed)
             residual = tv_residual(y, weight=0.08, max_num_iter=30)
-            spectrum = compute_log_rfft_spectrum(
-                residual,
-                target_height=512,
-                target_width_rfft=257,
-                dc_sigma_bins=3.0,
-            )
+            spectrum = compute_log_rfft_spectrum(residual, dc_sigma_bins=3.0)
             if not spectrum.any():
                 zero_count += 1
     return zero_count

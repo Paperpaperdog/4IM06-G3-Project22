@@ -34,7 +34,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 | RAISE 受控数据集 + 候选原图尺寸 | `synthesize_controlled_resampling_dataset.py` | `python synthesize_controlled_resampling_dataset.py 100 --download` |
 | JPEG vs ×8 块重采样（DCT/FFT） | `jpeg_resample_detector.py` | 见下方 A2 |
 | 训练 / 评估 Mask 分类器（n6） | `spectral-mask-resampling/` | `CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh` |
-| 训练 / 评估 CNN | `CNN/spectral-history-cnn/` | `bash scripts/run_v1_pipeline_full.sh` |
+| 训练 / 评估 CNN（n6） | `CNN/spectral-history-cnn/` | `CONFIG=configs/size_sweep/n6_poscnn_size64.yaml bash scripts/run_v1_pipeline_full.sh` |
 | 早期独立工具（仅供参考） | `archive/legacy_test_tools/` | 见 archive README |
 
 **RAISE 索引（唯一路径）**：[`data/raise_raw/RAISE_1k.csv`](data/raise_raw/RAISE_1k.csv)  
@@ -115,12 +115,19 @@ bash scripts/run_size_sweep.sh
 
 ## 路线 C：CNN（`CNN/spectral-history-cnn/`）
 
+n6 主协议：6 类、原生 rFFT 谱、每尺寸单独训练。
+
 ```bash
-cd CNN/spectral-history-cnn && bash scripts/run_v1_pipeline_full.sh
+cd CNN/spectral-history-cnn
+CONFIG=configs/size_sweep/n6_poscnn_size64.yaml bash scripts/run_v1_pipeline_full.sh
+# 四尺寸：bash scripts/run_size_sweep.sh
 ```
 
-- 6 类结果：`outputs/v1_final64_poscnn/`
-- 4 类配置：`configs/v1_final64_poscnn_local.yaml`
+- **配置**：`configs/size_sweep/n6_poscnn_size{32,64,96,128}.yaml`
+- **输出**：`results/cnn/n6_poscnn_size*`
+- **完整说明**：[`docs/EXPERIMENT_RUNBOOK.md`](docs/EXPERIMENT_RUNBOOK.md) §6
+
+历史 v1 基线（固定 64、旧 8 类配置）结果在 `outputs/v1_final64_poscnn/`；配置已移至 `configs/legacy/`。
 
 详见 [`CNN/spectral-history-cnn/README.md`](CNN/spectral-history-cnn/README.md)。
 

@@ -21,7 +21,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 mkdir -p logs
 
-export CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
+export CONFIG="${CONFIG:-configs/size_sweep/n6_poscnn_size64.yaml}"
 export RAISE_DIR="${RAISE_DIR:-$ROOT/../../spectral-mask-resampling/data/raw/raise_tiff}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 export LIMIT_SAMPLES="${LIMIT_SAMPLES:-}"

@@ -6,7 +6,7 @@ ROOT="$(cd "$ROOT" && pwd)"
 cd "$ROOT"
 export CNN_ROOT="$ROOT"
 
-CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
+CONFIG="${CONFIG:-configs/size_sweep/n6_poscnn_size64.yaml}"
 repo_root="$(cd "$ROOT/../.." && pwd)"
 RAISE_DIR="${RAISE_DIR:-$repo_root/spectral-mask-resampling/data/raw/raise_tiff}"
 if [[ ! -d "$RAISE_DIR" && -d "${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then

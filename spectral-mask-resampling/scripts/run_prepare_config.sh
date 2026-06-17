@@ -15,6 +15,7 @@ if [[ ! -d "$RAISE_TIFF_DIR" && -d "${repo_root/-integration/}/spectral-mask-res
   RAISE_TIFF_DIR="${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
 fi
 export RAISE_TIFF_DIR
+# Canonical train/val/test lists for Mask **and** CNN (mask split_raise.py, seed=123).
 SPLIT_JSON="${SPLIT_JSON:-data/splits/raise_split_seed123.json}"
 SAMPLES_PER_CLASS_PER_SIZE="${SAMPLES_PER_CLASS_PER_SIZE:-1000}"
 # 0 = use all CPU cores for the (size, class) block parallelism.

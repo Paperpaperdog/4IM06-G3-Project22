@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict
@@ -14,63 +15,22 @@ import pandas as pd
 from PIL import Image, ImageFile
 from tqdm import tqdm
 
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from experiments.unified_protocol import (  # noqa: E402
+    make_aligned_observed_patch,
+    normalize_split_data,
+    required_source_crop,
+)
 from src.processing.residuals import tv_residual
 from src.processing.spectrum import compute_log_rfft_spectrum
-from src.processing.transforms import apply_jpeg_pil, random_crop, resize_to_final, rgb_to_y_float
+from src.processing.transforms import rgb_to_y_float
+from src.utils.config_guard import reject_legacy_config_path
 from src.utils.io import ensure_dir, load_json, load_yaml, save_json, update_nested
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-
-# Minimum crop size (pixels) allowed for an upsampling class, so that an
-# upsample factor on a small final_size does not crop a degenerate patch.
-MIN_UPSAMPLE_CROP = 4
-
-SPLIT_SEED_OFFSETS = {"train": 0, "val": 100_000, "test": 200_000}
-
-
-def parse_class_spec(class_name: str) -> tuple[str, int]:
-    """Map a class name to ``(kind, factor)``.
-
-    Supported kinds: ``original`` / ``jpeg`` (factor 1), ``downsample`` and
-    ``upsample`` (factor parsed from the ``_xN`` suffix). This replaces the old
-    hard-coded crop table so that input size and up/down direction are derived
-    from the class name and the configured ``final_size``.
-    """
-    if class_name == "original":
-        return "original", 1
-    if class_name in ("JPEG", "JPEG_Q80"):
-        return "jpeg", 1
-    if class_name.startswith("downsample_x"):
-        return "downsample", int(class_name.rsplit("_x", 1)[-1])
-    if class_name.startswith("upsample_x"):
-        return "upsample", int(class_name.rsplit("_x", 1)[-1])
-    raise ValueError(
-        f"Unknown class '{class_name}'. Expected 'original', 'JPEG', "
-        "'downsample_xN' or 'upsample_xN'."
-    )
-
-
-def class_crop_size(class_name: str, final_size: int) -> int:
-    """Source crop size for a class given the final observed size.
-
-    - original / JPEG: crop exactly ``final_size``.
-    - downsample_xN: crop ``N * final_size`` then resize down to ``final_size``.
-    - upsample_xN: crop ``final_size // N`` then resize up to ``final_size``.
-    """
-    kind, factor = parse_class_spec(class_name)
-    if kind in ("original", "jpeg"):
-        return int(final_size)
-    if kind == "downsample":
-        return int(final_size) * int(factor)
-    crop = int(final_size) // int(factor)
-    if crop < MIN_UPSAMPLE_CROP:
-        raise ValueError(
-            f"Upsample class '{class_name}' with final_size={final_size} yields a "
-            f"degenerate crop of {crop}px (< {MIN_UPSAMPLE_CROP}). "
-            "Use a smaller factor or larger final_size."
-        )
-    return crop
 
 
 def resolve_image_path(raise_dir: Path, rel_path: str) -> Path:
@@ -132,89 +92,44 @@ def resolve_source_entry(
     }
 
 
-def make_final_image(
-    source_path: Path,
-    source_metadata: Dict[str, Any],
-    class_name: str,
-    final_size: int,
-    jpeg_quality: int,
-    interpolation: str,
-    rng: np.random.Generator,
-) -> tuple[Image.Image, Dict[str, Any]] | None:
-    crop_size = class_crop_size(class_name, final_size)
-    kind, _factor = parse_class_spec(class_name)
-    try:
-        with Image.open(source_path) as img:
-            img = img.convert("RGB")
-            cropped = random_crop(img, crop_size, rng)
-    except Exception:
-        return None
-
-    if cropped is None:
-        return None
-
-    crop, crop_x, crop_y = cropped
-    jpeg_value = ""
-    interpolation_value = ""
-
-    if kind == "jpeg":
-        final_img = apply_jpeg_pil(crop, jpeg_quality)
-        jpeg_value = int(jpeg_quality)
-    elif kind in ("downsample", "upsample"):
-        final_img = resize_to_final(crop, final_size, interpolation)
-        interpolation_value = interpolation
-    else:
-        final_img = crop
-
-    if final_img.size != (final_size, final_size):
-        final_img = resize_to_final(final_img, final_size, interpolation)
-
-    metadata = {
-        "source_filename": source_path.name,
-        "source_path": str(source_path),
-        "crop_size": crop_size,
-        "crop_x": crop_x,
-        "crop_y": crop_y,
-        "jpeg_quality": jpeg_value,
-        "interpolation": interpolation_value,
-    }
-    metadata.update(source_metadata)
-    return final_img.convert("RGB"), metadata
-
-
 def sample_one_spectrum(
-    source_entry: str | Dict[str, Any],
+    sources: list[str | Dict[str, Any]],
+    sample_index: int,
     class_id: int,
     class_name: str,
     split: str,
     config: Dict[str, Any],
     raise_dir: Path | None,
     image_cache_dir: Path,
-    rng: np.random.Generator,
 ) -> tuple[np.ndarray, Dict[str, Any]] | None:
     data_cfg = config["data"]
     prep_cfg = config["preprocessing"]
+    final_size = int(data_cfg["final_size"])
+    global_seed = int(data_cfg["seed"])
 
-    try:
-        source_path, source_metadata = resolve_source_entry(source_entry, raise_dir, image_cache_dir)
-    except Exception as exc:
-        print(f"Warning: failed to resolve source {source_entry}: {exc}")
-        return None
+    def open_source(entry: str | Dict[str, Any]) -> Image.Image | None:
+        try:
+            source_path, _source_metadata = resolve_source_entry(entry, raise_dir, image_cache_dir)
+            with Image.open(source_path) as img:
+                return img.convert("RGB").copy()
+        except Exception:
+            return None
 
-    result = make_final_image(
-        source_path=source_path,
-        source_metadata=source_metadata,
-        class_name=class_name,
-        final_size=int(data_cfg["final_size"]),
-        jpeg_quality=int(data_cfg["jpeg_quality"]),
-        interpolation=str(data_cfg["interpolation"]),
-        rng=rng,
+    patch = make_aligned_observed_patch(
+        sources,
+        open_source,
+        class_name,
+        final_size,
+        global_seed,
+        split,
+        class_id,
+        sample_index,
+        int(data_cfg["jpeg_quality"]),
     )
-    if result is None:
+    if patch is None:
         return None
-    final_img, metadata = result
 
-    y = rgb_to_y_float(final_img)
+    y = rgb_to_y_float(patch)
     residual = tv_residual(
         y,
         weight=float(prep_cfg["tv_weight"]),
@@ -222,15 +137,13 @@ def sample_one_spectrum(
         max_num_iter=int(prep_cfg["tv_max_num_iter"]),
     )
     spectrum = compute_log_rfft_spectrum(residual, dc_sigma_bins=float(prep_cfg["dc_sigma_bins"]))
-
-    metadata.update(
-        {
-            "split": split,
-            "class_id": class_id,
-            "class_name": class_name,
-            "random_seed": int(config["data"]["seed"]),
-        }
-    )
+    metadata = {
+        "split": split,
+        "class_id": class_id,
+        "class_name": class_name,
+        "sample_index": sample_index,
+        "random_seed": global_seed,
+    }
     return spectrum, metadata
 
 
@@ -247,7 +160,7 @@ def build_class_samples(
 ) -> tuple[np.ndarray, np.ndarray, list[Dict[str, Any]]]:
     data_cfg = config["data"]
     final_size = int(data_cfg["final_size"])
-    parse_class_spec(class_name)  # validate, raises on unknown class
+    required_source_crop(class_name, final_size)
     width_rfft = final_size // 2 + 1
     target_key = f"{split}_samples_per_class"
     target_per_class = int(data_cfg[target_key])
@@ -258,43 +171,31 @@ def build_class_samples(
     labels = np.full((target_per_class,), class_id, dtype=np.int64)
     metadata_rows: list[Dict[str, Any]] = []
 
-    base_seed = int(config["data"]["seed"]) + SPLIT_SEED_OFFSETS[split]
-    rng = np.random.default_rng(base_seed + class_id * 1009)
     progress = tqdm(
         total=target_per_class,
         desc=f"{split}:{class_name}",
         unit="sample",
         disable=not show_progress,
     )
-    made = 0
-    attempts = 0
-    max_attempts = max(target_per_class * 500, 5000)
-
-    while made < target_per_class:
-        if attempts >= max_attempts:
-            raise RuntimeError(
-                f"Could only generate {made}/{target_per_class} samples for {split}:{class_name}. "
-                f"Many images may be smaller than crop size {class_crop_size(class_name, final_size)}."
-            )
-        attempts += 1
-        source_entry = sources[int(rng.integers(0, len(sources)))]
+    for made in range(target_per_class):
         sample = sample_one_spectrum(
-            source_entry,
+            sources,
+            made,
             class_id,
             class_name,
             split,
             config,
             raise_dir,
             image_cache_dir,
-            rng,
         )
         if sample is None:
-            continue
-
+            raise RuntimeError(
+                f"Failed to generate sample {made} for {split}:{class_name} "
+                f"at final_size={final_size}"
+            )
         spectrum, metadata = sample
         spectra[made] = spectrum.astype(np.float16)
         metadata_rows.append(metadata)
-        made += 1
         progress.update(1)
     progress.close()
     return spectra, labels, metadata_rows
@@ -407,9 +308,10 @@ def build_all_splits_parallel(
     workers: int,
 ) -> None:
     class_names = list(config["data"]["classes"])
+    split_lists = normalize_split_data(split_data)
     tasks = []
     for split in ("train", "val", "test"):
-        sources = split_data["splits"][split]
+        sources = split_lists[split]
         for class_id, class_name in enumerate(class_names):
             tasks.append(
                 {
@@ -464,6 +366,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    reject_legacy_config_path(args.config)
     config = load_yaml(args.config)
     update_nested(config, "paths", "raise_dir", args.raise_dir)
     update_nested(config, "paths", "image_cache_dir", args.image_cache_dir)
@@ -472,6 +375,7 @@ def main() -> None:
 
     split_json_path = Path(config["paths"]["split_json"])
     split_data = load_json(split_json_path)
+    split_lists = normalize_split_data(split_data)
 
     raise_dir = None
     configured_raise_dir = config["paths"].get("raise_dir")
@@ -505,7 +409,7 @@ def main() -> None:
         )
     else:
         for split in ("train", "val", "test"):
-            sources = split_data["splits"][split]
+            sources = split_lists[split]
             build_split(
                 split,
                 sources,

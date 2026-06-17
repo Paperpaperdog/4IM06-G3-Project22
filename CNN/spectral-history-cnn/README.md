@@ -1,6 +1,10 @@
 # spectral-history-cnn
 
-Lightweight CNN pipeline for classifying the processing history of a final observed 64x64 RGB image patch from its TV-residual Fourier spectrum.
+> **n6 主实验**（当前 `project-integration` 分支）：见 [`docs/EXPERIMENT_RUNBOOK.md`](../../docs/EXPERIMENT_RUNBOOK.md) §6。  
+> 入口：`CONFIG=configs/size_sweep/n6_poscnn_size64.yaml bash scripts/run_v1_pipeline_full.sh`  
+> 旧 v1 配置在 `configs/legacy/`（勿用于新实验）。
+
+Lightweight CNN pipeline for classifying the processing history of a final observed RGB image patch from its TV-residual Fourier spectrum.
 
 The important task definition is:
 

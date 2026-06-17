@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from src.data.dataset import SpectraDataset
 from src.models.spectral_positional_cnn import SpectralPositionalCNN
 from src.utils.device import get_device, setup_device_env, use_pin_memory
+from src.utils.config_guard import reject_legacy_config_path
 from src.utils.io import ensure_dir, load_yaml, save_json, update_nested
 from src.utils.metrics import compute_classification_metrics
 from src.utils.plots import save_confusion_matrix
@@ -60,6 +61,7 @@ def main() -> None:
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
 
+    reject_legacy_config_path(args.config)
     config = load_yaml(args.config)
     apply_cli_overrides(config, args)
     setup_device_env(config)

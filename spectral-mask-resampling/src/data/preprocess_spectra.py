@@ -1,7 +1,7 @@
 import argparse
 import json
 import os
-import random
+import sys
 import urllib.parse
 import urllib.request
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -12,63 +12,22 @@ from numpy.lib.format import open_memmap
 from PIL import Image
 from tqdm import tqdm
 
-from src.data.make_patches import random_crop_rgb
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from experiments.unified_protocol import (  # noqa: E402
+    CANONICAL_CLASSES,
+    DEFAULT_SEED,
+    make_aligned_observed_patch,
+    required_source_crop,
+)
 from src.processing.residuals import tv_residual
 from src.processing.spectrum import compute_log_rfft_spectrum
-from src.processing.transforms import apply_jpeg_pil, resize_pil, rgb_to_y_float
+from src.processing.transforms import rgb_to_y_float
 
-
-# n6 protocol: 6-class set shared with the CNN pipeline so the two learnable
-# methods are directly comparable. Each observed size is trained separately and
-# the spectrum keeps its native rFFT resolution (no shared frequency grid).
-CLASS_NAMES = [
-    "original",
-    "JPEG_Q80",
-    "downsample_x8",
-    "downsample_x16",
-    "upsample_x4",
-    "upsample_x8",
-]
+CLASS_NAMES = list(CANONICAL_CLASSES)
 OBSERVED_SIZES = [128, 96, 64, 32]
-
-# Minimum source crop (pixels) for an upsampling class to avoid degenerate crops.
-MIN_UPSAMPLE_CROP = 4
-
-
-def parse_class_spec(class_name: str) -> tuple[str, int]:
-    """Map a class name to ``(kind, factor)``.
-
-    kinds: ``original`` / ``jpeg`` (factor 1), ``downsample`` (crop o*factor),
-    ``upsample`` (crop o//factor). Both then resample to the observed size o.
-    """
-    if class_name == "original":
-        return "original", 1
-    if class_name in ("JPEG", "JPEG_Q80"):
-        return "jpeg", 1
-    if class_name.startswith("downsample_x"):
-        return "downsample", int(class_name.rsplit("_x", 1)[-1])
-    if class_name.startswith("upsample_x"):
-        return "upsample", int(class_name.rsplit("_x", 1)[-1])
-    raise ValueError(
-        f"Unknown class '{class_name}'. Expected 'original', 'JPEG_Q80', "
-        "'downsample_xN' or 'upsample_xN'."
-    )
-
-
-def source_patch_size(class_name: str, observed_size: int) -> int:
-    """Source crop size for a class at a given observed size."""
-    kind, factor = parse_class_spec(class_name)
-    if kind in ("original", "jpeg"):
-        return int(observed_size)
-    if kind == "downsample":
-        return int(observed_size) * int(factor)
-    crop = int(observed_size) // int(factor)
-    if crop < MIN_UPSAMPLE_CROP:
-        raise ValueError(
-            f"Upsample class '{class_name}' with observed_size={observed_size} yields a "
-            f"degenerate crop of {crop}px (< {MIN_UPSAMPLE_CROP})."
-        )
-    return crop
 
 
 def is_url(source: str) -> bool:
@@ -93,19 +52,9 @@ def resolve_image_path(source: str, input_dir: Path | None, download_dir: Path) 
     return input_dir / source
 
 
-def process_patch(patch: Image.Image, class_name: str, args: argparse.Namespace) -> np.ndarray:
-    kind, _factor = parse_class_spec(class_name)
-    if kind == "original":
-        img = patch
-    elif kind == "jpeg":
-        img = apply_jpeg_pil(patch, args.jpeg_quality)
-    else:
-        # downsample (source patch > o) and upsample (source patch < o) both
-        # resample the cropped patch to the observed size o.
-        img = resize_pil(patch, args.observed_size, args.interpolation)
-    y = rgb_to_y_float(img)
+def process_observed_patch(patch: Image.Image, args: argparse.Namespace) -> np.ndarray:
+    y = rgb_to_y_float(patch)
     residual = tv_residual(y, weight=args.tv_weight, max_num_iter=args.tv_max_iter)
-    # Native per-size rFFT resolution: observed image is o x o -> (o, o//2+1).
     return compute_log_rfft_spectrum(residual, dc_sigma_bins=args.dc_sigma_bins)
 
 
@@ -125,35 +74,49 @@ def _generate_block(task: dict) -> tuple[int, int]:
     ``(block_pos, count)`` for progress accounting.
     """
     args = task["args"]
-    args.observed_size = task["observed_size"]
+    observed_size = task["observed_size"]
     class_name = task["class_name"]
     class_index = task["class_index"]
-    crop_size = task["crop_size"]
+    split = task["split"]
     count = task["count"]
     start = task["start"]
     images = task["images"]
     input_dir = task["input_dir"]
     download_dir = task["download_dir"]
 
-    rng = random.Random(task["block_seed"])
     spectra = open_memmap(task["spectra_path"], mode="r+")
     labels = open_memmap(task["labels_path"], mode="r+")
     observed_sizes = open_memmap(task["sizes_path"], mode="r+")
 
     source_cache: dict[str, Path] = {}
-    made = 0
-    while made < count:
-        source = rng.choice(images)
-        if source not in source_cache:
-            source_cache[source] = resolve_image_path(source, input_dir, download_dir)
-        with Image.open(source_cache[source]) as img:
-            if img.width < crop_size or img.height < crop_size:
-                continue
-            patch = random_crop_rgb(img, crop_size, rng)
-            spectra[start + made] = process_patch(patch, class_name, args).astype(args.dtype)
-            labels[start + made] = class_index
-            observed_sizes[start + made] = task["observed_size"]
-            made += 1
+
+    def open_source(entry: str) -> Image.Image | None:
+        if entry not in source_cache:
+            source_cache[entry] = resolve_image_path(entry, input_dir, download_dir)
+        with Image.open(source_cache[entry]) as img:
+            return img.convert("RGB").copy()
+
+    for made in range(count):
+        sample_index = made
+        patch = make_aligned_observed_patch(
+            images,
+            open_source,
+            class_name,
+            observed_size,
+            args.seed,
+            split,
+            class_index,
+            sample_index,
+            args.jpeg_quality,
+        )
+        if patch is None:
+            raise RuntimeError(
+                f"Failed to generate sample {sample_index} for {split}:{class_name} "
+                f"at observed_size={observed_size}"
+            )
+        spectra[start + made] = process_observed_patch(patch, args).astype(args.dtype)
+        labels[start + made] = class_index
+        observed_sizes[start + made] = observed_size
 
     spectra.flush()
     labels.flush()
@@ -188,24 +151,20 @@ def write_split(
     observed_sizes = open_memmap(sizes_path, mode="w+", dtype=np.int64, shape=(samples,))
     del spectra, labels, observed_sizes
 
-    split_seed = args.seed + {"train": 0, "val": 1, "test": 2}[split]
-
     tasks: list[dict] = []
     block_pos = 0
     for size_idx, observed_size in enumerate(args.observed_sizes):
         for class_index, class_name in enumerate(class_names):
-            crop_size = source_patch_size(class_name, observed_size)
+            required_source_crop(class_name, observed_size)
             tasks.append(
                 {
                     "block_pos": block_pos,
                     "start": block_pos * spc,
                     "count": spc,
+                    "split": split,
                     "observed_size": observed_size,
                     "class_name": class_name,
                     "class_index": class_index,
-                    "crop_size": crop_size,
-                    # Deterministic per-block seed (independent of worker count).
-                    "block_seed": split_seed * 100003 + size_idx * 1009 + class_index,
                     "images": images,
                     "input_dir": input_dir,
                     "download_dir": download_dir,
@@ -252,7 +211,7 @@ def main() -> None:
     parser.add_argument("--tv-weight", type=float, default=0.08)
     parser.add_argument("--tv-max-iter", type=int, default=30)
     parser.add_argument("--dc-sigma-bins", type=float, default=3.0)
-    parser.add_argument("--seed", type=int, default=123)
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--dtype", default="float16")
     parser.add_argument("--limit-images", type=int)
     parser.add_argument(
@@ -268,7 +227,7 @@ def main() -> None:
     # Validate that every requested class is supported (original / JPEG /
     # downsample_xN / upsample_xN).
     for class_name in args.classes:
-        parse_class_spec(class_name)
+        required_source_crop(class_name, args.observed_sizes[0])
     # Native spectra differ in shape per observed size, so one cache (one memmap)
     # holds a single size. Per-size sweep configs satisfy this by construction.
     if len(args.observed_sizes) != 1:

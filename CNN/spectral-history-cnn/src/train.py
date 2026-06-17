@@ -19,6 +19,7 @@ from src.utils.device import (
     supports_amp,
     use_pin_memory,
 )
+from src.utils.config_guard import reject_legacy_config_path
 from src.utils.io import ensure_dir, load_yaml, update_nested
 from src.utils.seed import set_seed
 
@@ -135,6 +136,7 @@ def main() -> None:
     parser.add_argument("--resume", default=None, help="Resume from checkpoint path (e.g. checkpoints/last.pt).")
     args = parser.parse_args()
 
+    reject_legacy_config_path(args.config)
     config = load_yaml(args.config)
     apply_cli_overrides(config, args)
 

@@ -7,7 +7,7 @@ ROOT="$(cd "$ROOT" && pwd)"
 cd "$ROOT"
 export CNN_ROOT="$ROOT"
 
-CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
+CONFIG="${CONFIG:-configs/size_sweep/n6_poscnn_size64.yaml}"
 LOG_DIR="${ROOT}/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/train_npu_${TS:-$(date +%Y%m%d_%H%M%S)}.log"

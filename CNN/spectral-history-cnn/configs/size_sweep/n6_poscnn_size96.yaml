@@ -6,8 +6,8 @@ paths:
   raise_csv: null
   raise_dir: ../../spectral-mask-resampling/data/raw/raise_tiff
   image_cache_dir: ../../spectral-mask-resampling/data/raw/raise_tiff
-  split_json: data/splits/raise_split_seed123_local.json
-  processed_dir: data/processed/n6_tv_rfft_size96
+  split_json: ../../spectral-mask-resampling/data/splits/raise_split_seed123.json
+  processed_dir: ../../data/processed/n6_spectra_size96
   output_dir: ../../results/cnn/n6_poscnn_size96
 
 data:
@@ -22,7 +22,7 @@ data:
   train_images: 700
   val_images: 150
   test_images: 150
-  train_samples_per_class: 5000
+  train_samples_per_class: 1000
   val_samples_per_class: 1000
   test_samples_per_class: 1000
   jpeg_quality: 80

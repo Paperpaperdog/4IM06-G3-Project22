@@ -10,7 +10,8 @@ mkdir -p "$LOG_DIR"
 OLD_JOB="${OLD_JOB:-job-178156654846153226537-jinbingrui}"
 WORKERS="${WORKERS:-18}"
 CPU_PER_TASK="${CPU_PER_TASK:-20}"
-JOB="${JOB:-cnn_spectral_v1_full_parallel}"
+JOB="${JOB:-n6_cnn_full_parallel}"
+CONFIG="${CONFIG:-configs/size_sweep/n6_poscnn_size64.yaml}"
 
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG_DIR/resubmit_parallel.log"; }
 
@@ -20,6 +21,7 @@ if vc list 2>/dev/null | rg -q "$OLD_JOB"; then
   sleep 5
 fi
 
-log "Submit parallel full run WORKERS=$WORKERS CPU_PER_TASK=$CPU_PER_TASK JOB=$JOB"
+log "Submit parallel full run WORKERS=$WORKERS CPU_PER_TASK=$CPU_PER_TASK JOB=$JOB CONFIG=$CONFIG"
 cd "$CODES"
-WORKERS="$WORKERS" CPU_PER_TASK="$CPU_PER_TASK" JOB="$JOB" bash vc_cnn_spectral_v1.sh | tee -a "$LOG_DIR/resubmit_parallel.log"
+WORKERS="$WORKERS" CPU_PER_TASK="$CPU_PER_TASK" JOB="$JOB" CONFIG="$CONFIG" \
+  bash vc_cnn_spectral_v1.sh | tee -a "$LOG_DIR/resubmit_parallel.log"

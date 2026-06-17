@@ -36,8 +36,9 @@ generation is guaranteed to match across routes.
 from __future__ import annotations
 
 import io
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
+import numpy as np
 from PIL import Image
 
 CANONICAL_CLASSES = [
@@ -51,12 +52,61 @@ CANONICAL_CLASSES = [
 
 OBSERVED_SIZES = [32, 64, 96, 128]
 
+DEFAULT_SEED = 123
 DEFAULT_JPEG_QUALITY = 80
+MIN_UPSAMPLE_CROP = 4
+
+SPLIT_NAMES = ("train", "val", "test")
 
 _UPSAMPLE_FACTORS = {"upsample_x4": 4, "upsample_x8": 8}
 _DOWNSAMPLE_FACTORS = {"downsample_x8": 8, "downsample_x16": 16}
 
 _BICUBIC = Image.Resampling.BICUBIC
+
+SourceEntry = TypeVar("SourceEntry")
+
+
+def normalize_split_data(split_data: dict) -> dict[str, list]:
+    """Accept mask-style ``{train: [...]}`` or CNN-style ``{splits: {train: [...]}}``."""
+    if "splits" in split_data:
+        return {name: list(split_data["splits"][name]) for name in SPLIT_NAMES}
+    return {name: list(split_data[name]) for name in SPLIT_NAMES}
+
+
+def per_sample_seed(
+    global_seed: int,
+    split: str,
+    observed_size: int,
+    class_index: int,
+    sample_index: int,
+) -> int:
+    """Deterministic seed for one (split, size, class, sample_index) draw.
+
+    Mask and CNN must call this with the same arguments so random source choice
+    and crop coordinates match pixel-for-pixel.
+    """
+    if split not in SPLIT_NAMES:
+        raise ValueError(f"split must be one of {SPLIT_NAMES}, got {split!r}")
+    split_id = SPLIT_NAMES.index(split)
+    return (
+        int(global_seed)
+        + split_id * 10_000_003
+        + int(observed_size) * 100_007
+        + int(class_index) * 1_009
+        + int(sample_index) * 7_919
+    )
+
+
+def sample_numpy_rng(
+    global_seed: int,
+    split: str,
+    observed_size: int,
+    class_index: int,
+    sample_index: int,
+) -> np.random.Generator:
+    return np.random.default_rng(
+        per_sample_seed(global_seed, split, observed_size, class_index, sample_index)
+    )
 
 
 def class_index(class_name: str) -> int:
@@ -76,7 +126,13 @@ def required_source_crop(class_name: str, observed_size: int) -> int:
             raise ValueError(
                 f"observed_size {observed_size} not divisible by upsample factor {factor}"
             )
-        return int(observed_size // factor)
+        crop = int(observed_size // factor)
+        if crop < MIN_UPSAMPLE_CROP:
+            raise ValueError(
+                f"Upsample class '{class_name}' with observed_size={observed_size} yields a "
+                f"degenerate crop of {crop}px (< {MIN_UPSAMPLE_CROP})."
+            )
+        return crop
     if class_name in _DOWNSAMPLE_FACTORS:
         return int(observed_size * _DOWNSAMPLE_FACTORS[class_name])
     raise ValueError(f"Unknown class '{class_name}'. Expected one of {CANONICAL_CLASSES}.")
@@ -145,6 +201,42 @@ def make_observed_patch(
 
     patch = source_img.crop((x, y, x + crop_size, y + crop_size))
     return transform_source_patch(patch, class_name, observed_size, jpeg_quality)
+
+
+def make_aligned_observed_patch(
+    source_entries: list[SourceEntry],
+    open_image: Callable[[SourceEntry], Image.Image | None],
+    class_name: str,
+    observed_size: int,
+    global_seed: int,
+    split: str,
+    class_index: int,
+    sample_index: int,
+    jpeg_quality: int = DEFAULT_JPEG_QUALITY,
+) -> Optional[Image.Image]:
+    """Generate one aligned RGB patch shared by Mask and CNN preprocessors.
+
+    Uses a fixed per-sample seed, then tries sources in a deterministic rotation
+    if the first pick is too small or unreadable.
+    """
+    n = len(source_entries)
+    if n == 0:
+        return None
+
+    rng = sample_numpy_rng(global_seed, split, observed_size, class_index, sample_index)
+    start_idx = int(rng.integers(0, n))
+    for k in range(n):
+        entry = source_entries[(start_idx + k) % n]
+        try:
+            img = open_image(entry)
+            if img is None:
+                continue
+            patch = make_observed_patch(img, class_name, observed_size, rng, jpeg_quality)
+            if patch is not None:
+                return patch
+        except Exception:
+            continue
+    return None
 
 
 def summary() -> str:

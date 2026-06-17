@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Generate summary figures for v1_fourier_ambiguity_mask_clean results."""
+"""Generate summary figures for a completed mask experiment directory.
+
+Default use: replot **historical v1** baseline, e.g.
+``--output-dir outputs/v1_fourier_ambiguity_mask_clean``.
+
+For n6 runs, pass ``--output-dir ../../results/mask/n6_mask_size64`` (or the
+size you trained). Not invoked by the n6 pipeline (train already writes figures).
+"""
 
 from __future__ import annotations
 
@@ -206,7 +213,9 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("outputs/v1_fourier_ambiguity_mask_clean"),
+        required=True,
+        help="Experiment output dir (v1: outputs/v1_fourier_ambiguity_mask_clean; "
+        "n6: ../../results/mask/n6_mask_size64)",
     )
     args = parser.parse_args()
 

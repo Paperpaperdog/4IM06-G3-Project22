@@ -2,7 +2,7 @@
 
 > 当前主协议：**n6**（6 类 × 4 观测尺寸，Mask/CNN 原生 rFFT 谱，每尺寸单独训练）  
 > 所有**输出**统一写入项目根目录 `results/`，按方法分子文件夹。  
-> 数据缓存仍在各子项目的 `data/processed/`（体积大，不入库）。
+> 谱缓存统一在项目根 `data/processed/n6_spectra_size{N}/`（Mask 与 CNN **共用**，体积大，不入库）。
 
 ---
 
@@ -15,7 +15,9 @@
 | **Mask 谱** | 原生 rFFT `(o, o//2+1)`；DC 抑制 → `log1p(abs(F))`（与 CNN 一致） |
 | **CNN 谱** | 原生 rFFT `(o, o//2+1)` + 位置编码（44 通道） |
 | **经典路线** | DCT-FFT 检测器 +（可选）NFA 源尺寸恢复；与 B/C 只在「是否重采样」二分轴上可比 |
-| **协议源码** | `experiments/unified_protocol.py` |
+| **协议源码** | `experiments/unified_protocol.py`（含 `make_aligned_observed_patch` / `per_sample_seed`） |
+| **Mask/CNN 样本对齐** | 同一 split JSON、同一 seed、同一每类样本数；逐样本确定性 RNG |
+| **共享 split** | `spectral-mask-resampling/data/splits/raise_split_seed123.json` |
 
 各尺寸原生谱形状：
 
@@ -149,19 +151,31 @@ python scripts/analysis/classical_size_sweep.py \
 
 | 尺寸 | 配置文件 | 数据缓存 | 结果目录 |
 |------|----------|----------|----------|
-| 32 | `spectral-mask-resampling/configs/size_sweep/n6_mask_size32.yaml` | `spectral-mask-resampling/data/processed/n6_mask_size32` | `results/mask/n6_mask_size32` |
-| 64 | `.../n6_mask_size64.yaml` | `.../n6_mask_size64` | `results/mask/n6_mask_size64` |
-| 96 | `.../n6_mask_size96.yaml` | `.../n6_mask_size96` | `results/mask/n6_mask_size96` |
-| 128 | `.../n6_mask_size128.yaml` | `.../n6_mask_size128` | `results/mask/n6_mask_size128` |
+| 32 | `spectral-mask-resampling/configs/size_sweep/n6_mask_size32.yaml` | `data/processed/n6_spectra_size32` | `results/mask/n6_mask_size32` |
+| 64 | `.../n6_mask_size64.yaml` | `data/processed/n6_spectra_size64` | `results/mask/n6_mask_size64` |
+| 96 | `.../n6_mask_size96.yaml` | `data/processed/n6_spectra_size96` | `results/mask/n6_mask_size96` |
+| 128 | `.../n6_mask_size128.yaml` | `data/processed/n6_spectra_size128` | `results/mask/n6_mask_size128` |
 
 训练超参（各尺寸相同）：AdamW lr=1e-3，batch=64，**epochs=30**，device=npu。
 
-### 5.2 单尺寸完整管线
+### 5.2 预处理（与 CNN 共用，每尺寸一遍）
+
+推荐在项目根执行（Mask/CNN 读同一目录）：
+
+```bash
+cd 4IM06-G3-Project22
+SIZE=64 bash scripts/prepare_n6_spectra.sh
+SIZES="32 64 96 128" bash scripts/prepare_n6_spectra.sh
+```
+
+等价于在 mask 子目录：`CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_prepare_config.sh`
+
+### 5.3 单尺寸完整管线
 
 ```bash
 cd spectral-mask-resampling
 
-# prepare → train → eval → viz
+# prepare → train → eval → viz（若共享缓存已存在则跳过 prepare）
 CONFIG=configs/size_sweep/n6_mask_size64.yaml \
   bash scripts/run_pipeline_config.sh
 
@@ -174,7 +188,7 @@ EVAL_ONLY=1 CONFIG=configs/size_sweep/n6_mask_size64.yaml \
   bash scripts/run_pipeline_config.sh
 ```
 
-### 5.3 仅预处理（CPU）
+### 5.4 仅预处理（CPU，mask 子目录方式）
 
 ```bash
 cd spectral-mask-resampling
@@ -182,12 +196,11 @@ cd spectral-mask-resampling
 CONFIG=configs/size_sweep/n6_mask_size64.yaml \
   bash scripts/run_prepare_config.sh
 
-# 多核并行（0 = 用满所有核）
 PREP_WORKERS=0 CONFIG=configs/size_sweep/n6_mask_size64.yaml \
   bash scripts/run_prepare_config.sh
 ```
 
-### 5.4 四尺寸顺序跑（交互节点）
+### 5.5 四尺寸顺序跑（交互节点）
 
 ```bash
 cd spectral-mask-resampling
@@ -197,7 +210,7 @@ bash scripts/run_size_sweep.sh
 SIZES="64 128" bash scripts/run_size_sweep.sh
 ```
 
-### 5.5 集群 NPU 提交
+### 5.6 集群 NPU 提交
 
 ```bash
 cd spectral-mask-resampling
@@ -216,7 +229,7 @@ EVAL_ONLY=1 bash scripts/submit_size_sweep_npu.sh
 
 每个尺寸提交一个 vc 作业，作业名 `n6_mask_size{N}`，配置 `configs/size_sweep/n6_mask_size{N}.yaml`。
 
-### 5.6 本地冒烟
+### 5.7 本地冒烟
 
 ```bash
 cd spectral-mask-resampling
@@ -234,20 +247,27 @@ LIMIT_IMAGES=4 SAMPLES_PER_CLASS_PER_SIZE=8 \
 
 | 尺寸 | 配置文件 | 数据缓存 | 结果目录 |
 |------|----------|----------|----------|
-| 32 | `CNN/spectral-history-cnn/configs/size_sweep/n6_poscnn_size32.yaml` | `CNN/spectral-history-cnn/data/processed/n6_tv_rfft_size32` | `results/cnn/n6_poscnn_size32` |
-| 64 | `.../n6_poscnn_size64.yaml` | `.../n6_tv_rfft_size64` | `results/cnn/n6_poscnn_size64` |
-| 96 | `.../n6_poscnn_size96.yaml` | `.../n6_tv_rfft_size96` | `results/cnn/n6_poscnn_size96` |
-| 128 | `.../n6_poscnn_size128.yaml` | `.../n6_tv_rfft_size128` | `results/cnn/n6_poscnn_size128` |
+| 32 | `CNN/spectral-history-cnn/configs/size_sweep/n6_poscnn_size32.yaml` | `data/processed/n6_spectra_size32` | `results/cnn/n6_poscnn_size32` |
+| 64 | `.../n6_poscnn_size64.yaml` | `data/processed/n6_spectra_size64` | `results/cnn/n6_poscnn_size64` |
+| 96 | `.../n6_poscnn_size96.yaml` | `data/processed/n6_spectra_size96` | `results/cnn/n6_poscnn_size96` |
+| 128 | `.../n6_poscnn_size128.yaml` | `data/processed/n6_spectra_size128` | `results/cnn/n6_poscnn_size128` |
 
 训练超参（各尺寸相同）：AdamW lr=3e-4，batch=256，**epochs=50**，AMP，device=npu。
 
-### 6.2 单尺寸完整管线
+### 6.2 单尺寸完整管线（主入口）
+
+**推荐**：`run_v1_pipeline_full.sh`（prepare → train → eval → visualize）。  
+`run_v1_train.sh` / `run_v1_eval.sh` 仅作分步调试；二者与管线脚本一样通过 `CONFIG` 选择 n6 配置（默认 `n6_poscnn_size64.yaml`）。
 
 ```bash
 cd CNN/spectral-history-cnn
 
 CONFIG=configs/size_sweep/n6_poscnn_size64.yaml \
   bash scripts/run_v1_pipeline_full.sh
+
+# 仅训练（需已有缓存）
+CONFIG=configs/size_sweep/n6_poscnn_size64.yaml \
+  bash scripts/run_v1_train.sh
 
 # 已有缓存
 SKIP_PREPARE=1 CONFIG=configs/size_sweep/n6_poscnn_size64.yaml \
@@ -381,6 +401,15 @@ A：将 `spectral-mask-resampling/scripts/vc_mask.sh` 复制到 `$CODES/vc_mask.
 **Q：经典 A-2 的 resample_x8 与 Mask/CNN 的 downsample_x8 一样吗？**  
 A：不一样。经典是分块重采样；Mask/CNN 是全局 bicubic 缩放。三方法只在「是否重采样 vs 原图/JPEG」二分轴上严格可比。
 
+**Q：`run_v1_train.sh` 和 `run_v1_pipeline_full.sh` 用哪个？**  
+A：n6 主实验用 **`run_v1_pipeline_full.sh`**（或 `run_size_sweep.sh` 跑四尺寸）。`run_v1_train.sh` 只跑训练，默认 `CONFIG=configs/size_sweep/n6_poscnn_size64.yaml`；历史 v1 配置在 `archive/legacy-u6-u7` 分支。
+
+**Q：`resample_sample_list.py` 还要跑吗？**  
+A：**不用**。那是 v1 时代修补 `RAISE-1000-ms/sample_list.csv` 的遗留工具；n6 用 `split_raise.py` + `run_prepare_config.sh`，不在 runbook 主路径里。
+
+**Q：误用了 `configs/legacy/` 里的 v1 配置怎么办？**  
+A：`train.py` / `evaluate.py` / `preprocess_spectra.py` 会拒绝 legacy 路径。若确需复现旧实验：`ALLOW_LEGACY_CONFIG=1`（配置在 `CNN/.../configs/legacy/`）。
+
 ---
 
 ## 11. 相关文档
@@ -392,3 +421,22 @@ A：不一样。经典是分块重采样；Mask/CNN 是全局 bicubic 缩放。�
 | [`02_spectral_mask.md`](02_spectral_mask.md) | Mask 方法与 n6 协议 |
 | [`03_spectral_cnn.md`](03_spectral_cnn.md) | CNN 方法与 n6 协议 |
 | [`SUPPLEMENTARY_EXPERIMENTS.md`](SUPPLEMENTARY_EXPERIMENTS.md) | 补充实验 E2/E4 等 |
+
+---
+
+## 12. Mask / CNN 数据对齐（P0+P1）
+
+**结论：训练用的 1 通道 log 谱缓存是同一份文件。**
+
+| 项目 | 内容 |
+|------|------|
+| **共享 split** | `spectral-mask-resampling/data/splits/raise_split_seed123.json` |
+| **对齐采样** | `experiments/unified_protocol.py` → `make_aligned_observed_patch` + `per_sample_seed` |
+| **统一样本数** | train/val/test 各 **1000 / 类 / 尺寸** |
+| **共享谱缓存** | `data/processed/n6_spectra_size{N}/`（Mask `data_dir` = CNN `processed_dir`） |
+| **预处理入口** | `SIZE=N bash scripts/prepare_n6_spectra.sh`（**每个尺寸只跑一次**） |
+| **训练差异** | 仅模型侧：CNN 在读取谱后加 44 通道 positional encoding；Mask 用可学习 mask |
+
+CNN 完整管线里的 prepare 步骤若发现共享缓存已存在会自动跳过；也可先统一 preprocess 再 `SKIP_PREPARE=1` 分别训 Mask/CNN。
+
+> 若仍使用旧的双份缓存（`n6_mask_size*` / `n6_tv_rfft_size*`），请删除后重跑 `prepare_n6_spectra.sh`。
