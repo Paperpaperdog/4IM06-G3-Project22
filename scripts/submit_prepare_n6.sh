@@ -54,16 +54,22 @@ run_one_size() {
 submit_cluster_size() {
   local size="$1"
   local codes="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
-  local wrapper="${VC_PREPARE_WRAPPER:-vc_prepare_n6.sh}"
+  local wrapper_name="${VC_PREPARE_WRAPPER:-vc_prepare_n6.sh}"
+  local wrapper=""
+  if [[ -f "$codes/$wrapper_name" ]]; then
+    wrapper="$codes/$wrapper_name"
+  elif [[ -f "$REPO_ROOT/scripts/vc_prepare_n6.sh" ]]; then
+    wrapper="$REPO_ROOT/scripts/vc_prepare_n6.sh"
+    echo "NOTE: using repo wrapper $wrapper (copy to $codes/$wrapper_name for login-node submit)" >&2
+  else
+    echo "ERROR: missing vc_prepare_n6.sh in $codes and $REPO_ROOT/scripts/" >&2
+    exit 1
+  fi
   if [[ ! -d "$codes" ]]; then
     echo "ERROR: CODES dir not found: $codes" >&2
     exit 1
   fi
-  if [[ ! -f "$codes/$wrapper" ]]; then
-    echo "ERROR: copy scripts/vc_prepare_n6.sh to $codes/$wrapper" >&2
-    exit 1
-  fi
-  echo "=== cluster submit size=$size JOB=n6_prepare_size${size} ==="
+  echo "=== cluster submit size=$size JOB=n6_prepare_size${size} wrapper=$wrapper ==="
   (
     cd "$codes"
     REPO_ROOT="$REPO_ROOT" \

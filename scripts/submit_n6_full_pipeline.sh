@@ -59,7 +59,8 @@ TS="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOG_ROOT/pipeline_${TS}.log"
 
 log() {
-  echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"
+  echo "[$(date '+%F %T')] $*"
+  echo "[$(date '+%F %T')] $*" >> "$LOG_FILE"
 }
 
 cache_ready() {
