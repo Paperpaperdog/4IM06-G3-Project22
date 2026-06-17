@@ -8,6 +8,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CNN_ROOT="${CNN_ROOT:-$(cd "$ROOT" && pwd)}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/../.." && pwd)}"
+# RAISE TIFF may live in the non-integration checkout; pass explicitly if needed.
+RAISE_DIR="${RAISE_DIR:-$REPO_ROOT/spectral-mask-resampling/data/raw/raise_tiff}"
+if [[ ! -d "$RAISE_DIR" && -d "${REPO_ROOT/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then
+  RAISE_DIR="${REPO_ROOT/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
+fi
 CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
 SIZES="${SIZES:-32 64 96 128}"
 EPOCHS="${EPOCHS:-50}"
@@ -25,8 +32,10 @@ for size in $SIZES; do
     echo "SKIP: missing config $ROOT/$cfg" >&2
     continue
   fi
-  echo "=== submit CNN size=$size config=$cfg ==="
+  echo "=== submit CNN size=$size config=$cfg CNN_ROOT=$CNN_ROOT ==="
   cd "$CODES"
+  CNN_ROOT="$CNN_ROOT" \
+  RAISE_DIR="$RAISE_DIR" \
   CONFIG="$cfg" \
   EPOCHS="$EPOCHS" \
   SKIP_PREPARE="$SKIP_PREPARE" \

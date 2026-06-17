@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${CNN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+ROOT="$(cd "$ROOT" && pwd)"
 cd "$ROOT"
+export CNN_ROOT="$ROOT"
 
 CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
 RAISE_DIR="${RAISE_DIR:-../../spectral-mask-resampling/data/raw/raise_tiff}"
