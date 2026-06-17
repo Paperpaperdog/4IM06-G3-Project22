@@ -21,8 +21,11 @@ if [[ -z "$REPO_ROOT" ]]; then
   REPO_ROOT="${HOME}/Codes/4IM06-G3-Project22-integration"
 fi
 MASK_ROOT="$REPO_ROOT/spectral-mask-resampling"
+CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
+VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
 WORKER="$MASK_ROOT/scripts/vc_worker.sh"
 
+export REPO_ROOT CNN_ROOT VENV_DIR
 export CONFIG="${CONFIG:-configs/u6_mask_combined.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
@@ -36,6 +39,7 @@ if [[ ! -f "$WORKER" ]]; then
 fi
 
 echo "vc_mask_u6: JOB=$JOB CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE WORKER=$WORKER"
+echo "  REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR"
 
 # ---------------------------------------------------------------------------
 # TODO(cluster): replace the block below with the real `vc` submit line copied
@@ -45,10 +49,7 @@ echo "vc_mask_u6: JOB=$JOB CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE WORKER=$WOR
 #     --job "$JOB" \
 #     --image <ascend-torch-npu-image> \
 #     --cpu "$CPU_PER_TASK" --npu 1 \
-#     -- bash "$WORKER"
-#
-# Pass CONFIG / SKIP_PREPARE through to the worker the same way the CNN wrapper
-# passes them (they are already exported above).
+#     --cmd "REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE bash $WORKER"
 # ---------------------------------------------------------------------------
 if command -v vc >/dev/null 2>&1 && [[ -n "${VC_SUBMIT_CMD:-}" ]]; then
   # Optional: provide a full submit command template via VC_SUBMIT_CMD, e.g.

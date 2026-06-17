@@ -23,9 +23,7 @@ pick_container_npu_python() {
     command -v "$py" >/dev/null 2>&1 || [[ -x "$py" ]] || continue
     if python_has_npu "$py"; then
       export PYTHONNOUSERSITE=1
-      if [[ "$py" != python3* ]] && [[ "$py" != /usr/bin/python3 ]]; then
-        export PYTHON="$py"
-      fi
+      export PYTHON="$py"
       echo "Using container python (torch_npu): $py"
       return 0
     fi
@@ -35,9 +33,9 @@ pick_container_npu_python() {
 
 if [[ "${DEVICE:-}" == "npu" ]]; then
   if pick_container_npu_python; then
-  PY="${PYTHON:-python3}"
-  # shellcheck disable=SC1091
-  source "$ROOT/scripts/ensure_npu_deps.sh" "$PY"
+    PY="${PYTHON:-python3}"
+    # shellcheck disable=SC1091
+    source "$ROOT/scripts/ensure_npu_deps.sh" "$PY"
   else
     echo "ERROR: DEVICE=npu but no working torch_npu python found." >&2
     echo "  Ensure Ascend env is loaded and ~/.local torch is not shadowing container torch." >&2

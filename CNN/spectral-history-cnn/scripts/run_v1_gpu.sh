@@ -12,7 +12,11 @@ export CNN_ROOT="$ROOT"
 export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
 export CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
-export RAISE_DIR="${RAISE_DIR:-$ROOT/../../spectral-mask-resampling/data/raw/raise_tiff}"
+repo_root="$(cd "$ROOT/../.." && pwd)"
+export RAISE_DIR="${RAISE_DIR:-$repo_root/spectral-mask-resampling/data/raw/raise_tiff}"
+if [[ ! -d "$RAISE_DIR" && -d "${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then
+  export RAISE_DIR="${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
+fi
 export DEVICE="${DEVICE:-npu}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
 # Avoid ~/.local CUDA torch shadowing container torch_npu on NPU nodes.

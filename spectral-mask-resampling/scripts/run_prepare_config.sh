@@ -9,15 +9,24 @@ cd "$ROOT"
 export PYTHONPATH=.
 
 CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/u6_mask_size64.yaml}"
-RAISE_TIFF_DIR="${RAISE_TIFF_DIR:-data/raw/raise_tiff}"
+repo_root="$(cd "$ROOT/.." && pwd)"
+RAISE_TIFF_DIR="${RAISE_TIFF_DIR:-$ROOT/data/raw/raise_tiff}"
+if [[ ! -d "$RAISE_TIFF_DIR" && -d "${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then
+  RAISE_TIFF_DIR="${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
+fi
+export RAISE_TIFF_DIR
 SPLIT_JSON="${SPLIT_JSON:-data/splits/raise_split_seed123.json}"
 SAMPLES_PER_CLASS_PER_SIZE="${SAMPLES_PER_CLASS_PER_SIZE:-1000}"
 # 0 = use all CPU cores for the (size, class) block parallelism.
 PREP_WORKERS="${PREP_WORKERS:-0}"
 
 # Prepare needs PIL/numpy/torch — use project venv, not bare python3.
-# shellcheck disable=SC1091
-source "$ROOT/scripts/resolve_python.sh" cpu
+if [[ -z "${PYTHON:-}" ]]; then
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/resolve_python.sh" cpu
+else
+  echo "Using prepare python (inherited): $PYTHON"
+fi
 PY="${PYTHON:-python3}"
 
 if [[ ! -d "${RAISE_TIFF_DIR}" ]]; then

@@ -14,6 +14,11 @@ cd "$ROOT"
 export PYTHONUNBUFFERED=1
 export PYTHONPATH=.
 
+REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/.." && pwd)}"
+export REPO_ROOT
+export CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
+export VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
+
 CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/u6_mask_size64.yaml}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
 
@@ -23,10 +28,12 @@ TS="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOG_DIR/mask_pipeline_${TS}.log"
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"; }
 
-DEVICE_NAME="$(python3 -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['training']['device'])" 2>/dev/null || echo npu)"
+# Avoid requiring PyYAML on bare python3 before venv/NPU python is resolved.
+DEVICE_NAME="$(grep -E '^[[:space:]]*device:[[:space:]]*' "$CONFIG" | head -1 | sed -E 's/.*device:[[:space:]]*//' | tr -d "\"'")"
+DEVICE_NAME="${DEVICE_NAME:-npu}"
 
 log "=== mask pipeline start ==="
-log "CONFIG=$CONFIG DEVICE=$DEVICE_NAME SKIP_PREPARE=$SKIP_PREPARE"
+log "CONFIG=$CONFIG DEVICE=$DEVICE_NAME SKIP_PREPARE=$SKIP_PREPARE CNN_ROOT=$CNN_ROOT"
 
 if [[ "$SKIP_PREPARE" != "1" ]]; then
   # shellcheck disable=SC1091

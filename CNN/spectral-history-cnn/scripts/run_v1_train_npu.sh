@@ -2,8 +2,10 @@
 # Train + eval + visualize on NPU (skip prepare if data already exists).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${CNN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+ROOT="$(cd "$ROOT" && pwd)"
 cd "$ROOT"
+export CNN_ROOT="$ROOT"
 
 CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
 LOG_DIR="${ROOT}/logs"

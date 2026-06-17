@@ -14,7 +14,7 @@ data:
   final_size: 96
   classes:
     - original
-    - JPEG
+    - JPEG_Q80
     - downsample_x8
     - downsample_x16
     - upsample_x2

@@ -32,6 +32,7 @@ resolve_cpu() {
   for v in "${_venv_candidates[@]}"; do
     [[ -n "$v" ]] || continue
     if venv_ok "$v"; then
+      export PYTHON="$v/bin/python"
       # shellcheck disable=SC1091
       source "$v/bin/activate"
       echo "Using venv for prepare: $v"
@@ -39,6 +40,7 @@ resolve_cpu() {
     fi
   done
   if command -v python3 >/dev/null 2>&1 && python3 -c "$PREPARE_IMPORTS" >/dev/null 2>&1; then
+    export PYTHON="python3"
     echo "Using system python3 (cpu/prepare)"
     return 0
   fi

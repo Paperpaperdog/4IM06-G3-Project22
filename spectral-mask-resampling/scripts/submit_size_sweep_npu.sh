@@ -15,6 +15,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # cluster wrapper finds vc_worker.sh even when the checkout is named e.g.
 # 4IM06-G3-Project22-integration instead of 4IM06-G3-Project22.
 REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/.." && pwd)}"
+CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
+VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
 CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
 VC_WRAPPER="${VC_WRAPPER:-vc_mask_u6.sh}"
 SIZES="${SIZES:-32 64 96 128}"
@@ -38,9 +40,11 @@ for size in $SIZES; do
     echo "SKIP: missing config $ROOT/$cfg" >&2
     continue
   fi
-  echo "=== submit mask size=$size config=$cfg REPO_ROOT=$REPO_ROOT ==="
+  echo "=== submit mask size=$size config=$cfg REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT ==="
   cd "$CODES"
   REPO_ROOT="$REPO_ROOT" \
+  CNN_ROOT="$CNN_ROOT" \
+  VENV_DIR="$VENV_DIR" \
   CONFIG="$cfg" \
   SKIP_PREPARE="$SKIP_PREPARE" \
   JOB="mask_u6_size${size}" \

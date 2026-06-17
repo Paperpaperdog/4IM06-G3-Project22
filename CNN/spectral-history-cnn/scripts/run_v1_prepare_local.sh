@@ -8,10 +8,19 @@ export PYTHONPATH=.
 export CNN_ROOT="$ROOT"
 
 # shellcheck disable=SC1091
-source "$ROOT/scripts/resolve_prepare_python.sh"
+if [[ -z "${PREP_PY:-}" ]]; then
+  source "$ROOT/scripts/resolve_prepare_python.sh"
+else
+  echo "Using prepare python (inherited): $PREP_PY"
+fi
 
 CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
-RAISE_DIR="${RAISE_DIR:-../../spectral-mask-resampling/data/raw/raise_tiff}"
+repo_root="$(cd "$ROOT/../.." && pwd)"
+RAISE_DIR="${RAISE_DIR:-$repo_root/spectral-mask-resampling/data/raw/raise_tiff}"
+if [[ ! -d "$RAISE_DIR" && -d "${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then
+  RAISE_DIR="${repo_root/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
+fi
+export RAISE_DIR
 SPLIT_JSON="${SPLIT_JSON:-data/splits/raise_split_seed123_local.json}"
 
 if [[ ! -f "$ROOT/$CONFIG" ]]; then
