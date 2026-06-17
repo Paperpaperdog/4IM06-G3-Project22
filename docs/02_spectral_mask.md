@@ -306,9 +306,12 @@ v1（512×257 归一化频率网格、4 类）的配置与流水线脚本已移�
 
 | 文件 | 说明 |
 |------|------|
-| `src/processing/spectrum.py` | `compute_log_rfft_spectrum(residual, dc_sigma_bins)`：直接返回原生 \((o,\,o/2{+}1)\) 谱（DC 抑制按实际谱尺寸计算），不再做任何频率网格重采样 |
+| `src/processing/spectrum.py` | `compute_log_rfft_spectrum(residual, dc_sigma_bins)`：rFFT2 → 垂直 fftshift → **在原生复数谱上做 DC 抑制** → `log1p(abs(F))`，返回原生 \((1,o,o/2{+}1)\) 谱。与 CNN 路线 `compute_log_rfft_spectrum` **逐位一致**（同一 `build_dc_weight`、同样的 DC-先于-log 顺序），两条路线吃完全相同的谱表示 |
 | `src/data/preprocess_spectra.py` | 强制**单一观测尺寸**，缓存谱 shape = \((N,1,o,o/2{+}1)\) |
 | `scripts/run_prepare_config.sh` | 从 config 读 `data_dir / class_names / observed_sizes`，谱恒为原生分辨率 |
+
+> 注：DC 抑制现在作用在**复数谱** \(F\) 上（`F = F · dc_weight`），再取 `log1p(|F|)`；
+> 这与 CNN 完全一致。之前 Mask 是先 `log1p(|F|)` 再乘权重（顺序相反），现已统一。
 
 `src/train.py` / `src/evaluate.py` 按 config 的 `spectrum.height/width_rfft` 建模型。各尺寸原生谱形状：
 
