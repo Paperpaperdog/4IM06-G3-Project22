@@ -50,8 +50,13 @@ DATA_DIR="${_cfg_lines[0]}"
 CLASSES="${_cfg_lines[1]}"
 OBSERVED_SIZES="${_cfg_lines[2]}"
 
+# Resolve relative data_dir from mask subproject root -> repo_root/data/processed/...
+if [[ "$DATA_DIR" != /* ]]; then
+  DATA_DIR="$(cd "$ROOT" && realpath -m "$DATA_DIR")"
+fi
+
 echo "CONFIG=$CONFIG"
-echo "DATA_DIR=$DATA_DIR"
+echo "DATA_DIR=$DATA_DIR (absolute)"
 echo "CLASSES=$CLASSES"
 echo "OBSERVED_SIZES=$OBSERVED_SIZES (native rFFT spectrum)"
 

@@ -3,7 +3,7 @@
 # (32 x 17) instead of remapping to the shared 512x257 grid. Class set matches
 # the n6 CNN sweep for direct comparison.
 experiment_name: n6_mask_size32
-data_dir: ../../data/processed/n6_spectra_size32
+data_dir: ../data/processed/n6_spectra_size32
 output_dir: ../results/mask/n6_mask_size32
 
 num_classes: 6

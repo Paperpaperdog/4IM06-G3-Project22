@@ -1,67 +1,58 @@
 #!/usr/bin/env bash
-# Reference cluster-side vc wrapper for the n6 6-class mask pipeline.
-# This is the mask counterpart of vc_cnn_spectral_v1.sh. Copy it next to
-# vc_cnn_spectral_v1.sh in your $CODES directory on the cluster.
+# Submit mask spectral-mask-resampling pipeline to Ascend NPU via vc (pdgpu-sjtu-ai).
+# Copy to ~/Codes/vc_mask.sh next to vc_cnn_spectral_v1.sh.
 #
-# It receives env from submit_size_sweep_npu.sh (CONFIG, JOB, SKIP_PREPARE, ...)
-# and submits a vc job that runs spectral-mask-resampling/scripts/vc_worker.sh
-# on an Ascend NPU node.
+# From integration repo:
+#   cd 4IM06-G3-Project22-integration/spectral-mask-resampling
+#   SKIP_PREPARE=1 bash scripts/submit_size_sweep_npu.sh
 #
-# IMPORTANT: the exact `vc` submit command is cluster-specific. Copy the single
-# `vc ...` submit line from your working vc_cnn_spectral_v1.sh and only swap the
-# worker script path to $WORKER below. Until you do, this script falls back to
-# running the worker directly (use that on an already-allocated NPU node).
+# Single size:
+#   REPO_ROOT=.../4IM06-G3-Project22-integration \
+#   CONFIG=configs/size_sweep/n6_mask_size64.yaml \
+#   JOB=n6_mask_size64 SKIP_PREPARE=1 \
+#   bash ~/Codes/vc_mask.sh
 set -euo pipefail
 
-# Cluster checkout root for this repo. submit_size_sweep_npu.sh passes REPO_ROOT
-# automatically; override only if you invoke this wrapper by hand.
-REPO_ROOT="${REPO_ROOT:-}"
-if [[ -z "$REPO_ROOT" ]]; then
-  # Fallback when run directly without submit script (edit to your checkout).
-  REPO_ROOT="${HOME}/Codes/4IM06-G3-Project22-integration"
-fi
-MASK_ROOT="$REPO_ROOT/spectral-mask-resampling"
-CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
-VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
-WORKER="$MASK_ROOT/scripts/vc_worker.sh"
-
-export REPO_ROOT CNN_ROOT VENV_DIR
-export CONFIG="${CONFIG:-configs/size_sweep/n6_mask_size64.yaml}"
-export SKIP_PREPARE="${SKIP_PREPARE:-0}"
-export EVAL_ONLY="${EVAL_ONLY:-0}"
-export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
+n_gpus="${N_GPUS:-1}"
+PARTITION="${PARTITION:-pdgpu-sjtu-ai}"
+IMAGE="${IMAGE:-hub.szaic.com/sjtu/sjtu_wumengyue-kunyao.lan:vllm_25.4.12}"
 JOB="${JOB:-n6_mask}"
-CPU_PER_TASK="${CPU_PER_TASK:-20}"
 
+export REPO_ROOT="${REPO_ROOT:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes/4IM06-G3-Project22-integration}"
+export CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
+export VENV_DIR="${VENV_DIR:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes/4IM06-G3-Project22/spectral-mask-resampling/.venv}"
+
+MASK_ROOT="$REPO_ROOT/spectral-mask-resampling"
+WORKER="${MASK_ROOT}/scripts/vc_worker.sh"
 if [[ ! -f "$WORKER" ]]; then
-  echo "ERROR: mask worker not found: $WORKER" >&2
-  echo "Set REPO_ROOT to the cluster checkout of this repo." >&2
+  echo "ERROR: worker not found: $WORKER" >&2
   exit 1
 fi
 
-echo "vc_mask: JOB=$JOB CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE WORKER=$WORKER"
-echo "  REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR"
-
-# ---------------------------------------------------------------------------
-# TODO(cluster): replace the block below with the real `vc` submit line copied
-# from vc_cnn_spectral_v1.sh, e.g. (illustrative only):
-#
-#   vc submit \
-#     --job "$JOB" \
-#     --image <ascend-torch-npu-image> \
-#     --cpu "$CPU_PER_TASK" --npu 1 \
-#     --cmd "REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE bash $WORKER"
-# ---------------------------------------------------------------------------
-if command -v vc >/dev/null 2>&1 && [[ -n "${VC_SUBMIT_CMD:-}" ]]; then
-  # Optional: provide a full submit command template via VC_SUBMIT_CMD, e.g.
-  #   VC_SUBMIT_CMD='vc submit --job {JOB} --npu 1 -- bash {WORKER}'
-  cmd="${VC_SUBMIT_CMD//\{JOB\}/$JOB}"
-  cmd="${cmd//\{WORKER\}/$WORKER}"
-  cmd="${cmd//\{CPU\}/$CPU_PER_TASK}"
-  echo "Submitting via: $cmd"
-  eval "$cmd"
-else
-  echo "WARN: no vc submit command configured; running worker directly." >&2
-  echo "      (fine on an allocated NPU node; set VC_SUBMIT_CMD to queue a job)" >&2
-  bash "$WORKER"
+CONFIG="${CONFIG:-configs/size_sweep/n6_mask_size64.yaml}"
+if [[ ! -f "${MASK_ROOT}/${CONFIG}" ]]; then
+  echo "ERROR: config not found: ${MASK_ROOT}/${CONFIG}" >&2
+  exit 1
 fi
+
+CMD="REPO_ROOT=${REPO_ROOT} CNN_ROOT=${CNN_ROOT} VENV_DIR=${VENV_DIR} CONFIG=${CONFIG} bash ${WORKER}"
+
+[[ -n "${SKIP_PREPARE:-}" ]] && CMD="SKIP_PREPARE=${SKIP_PREPARE} ${CMD}"
+[[ -n "${EVAL_ONLY:-}"   ]] && CMD="EVAL_ONLY=${EVAL_ONLY} ${CMD}"
+
+echo "Submitting JOB=$JOB"
+echo "  REPO_ROOT=$REPO_ROOT"
+echo "  MASK_ROOT=$MASK_ROOT"
+echo "  CONFIG=$CONFIG"
+echo "  WORKER=$WORKER"
+
+set -x
+vc submit \
+    --image "$IMAGE" \
+    --partition "$PARTITION" \
+    --gpu-per-task "${n_gpus}" \
+    --job "$JOB" \
+    --mem-per-task "${MEM_PER_TASK:-64G}" \
+    --cpu-per-task "${CPU_PER_TASK:-20}" \
+    --num-task 1 \
+    --cmd "$CMD"

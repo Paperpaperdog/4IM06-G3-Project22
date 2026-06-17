@@ -65,8 +65,25 @@ log() {
 
 cache_ready() {
   local size="$1"
-  local d="$REPO_ROOT/data/processed/n6_spectra_size${size}"
-  [[ -f "$d/train_spectra.npy" && -f "$d/val_spectra.npy" && -f "$d/test_spectra.npy" ]]
+  local d
+  for d in \
+    "$REPO_ROOT/data/processed/n6_spectra_size${size}" \
+    "$(dirname "$REPO_ROOT")/data/processed/n6_spectra_size${size}"; do
+    if [[ -f "$d/train_spectra.npy" && -f "$d/val_spectra.npy" && -f "$d/test_spectra.npy" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+fix_legacy_cache_layout() {
+  local legacy_root="$(dirname "$REPO_ROOT")/data/processed"
+  local canonical_root="$REPO_ROOT/data/processed"
+  if [[ -d "$legacy_root" && ! -e "$canonical_root" ]]; then
+    log "Linking legacy cache $legacy_root -> $canonical_root"
+    mkdir -p "$(dirname "$canonical_root")"
+    ln -sfn "$legacy_root" "$canonical_root"
+  fi
 }
 
 all_caches_ready() {
@@ -110,6 +127,7 @@ run_prepare_phase() {
 }
 
 wait_for_prepare() {
+  fix_legacy_cache_layout
   if all_caches_ready; then
     log "Caches ready — no wait needed"
     return 0
@@ -185,6 +203,7 @@ main() {
 
   if [[ "$TRAIN_ONLY" != "1" ]]; then
     run_prepare_phase
+    fix_legacy_cache_layout
     if ! all_caches_ready; then
       wait_for_prepare
     fi
@@ -195,6 +214,8 @@ main() {
     log "PREPARE_ONLY — done after prepare"
     exit 0
   fi
+
+  fix_legacy_cache_layout
 
   if ! all_caches_ready; then
     log "ERROR: train phase aborted — caches missing for: $(missing_sizes)"
