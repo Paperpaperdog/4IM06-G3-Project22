@@ -1,0 +1,9 @@
+method,input_size,split,six_class_accuracy,macro_f1,binary_resampling_accuracy,note
+mask,32,test,0.6051666666666666,0.5921946130600739,0.8348333333333333,
+cnn,32,val_best_epoch,0.7363333333333333,,,epoch=22; test metrics missing
+mask,64,test,0.6278333333333334,0.6054224797573413,0.8543333333333333,
+cnn,64,val_best_epoch,0.7881666666666667,,,epoch=31; test metrics missing
+mask,96,test,0.6421666666666667,0.6176369226224105,0.8665,
+cnn,96,val_best_epoch,0.8255,,,epoch=34; test metrics missing
+mask,128,test,0.6478333333333334,0.6200799686231563,0.8671666666666666,
+cnn,128,val_best_epoch,0.837,,,epoch=24; test metrics missing

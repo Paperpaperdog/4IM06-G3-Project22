@@ -6,13 +6,21 @@ __pycache__/
 .matplotlib-cache/
 .DS_Store
 
-# Unified results tree (results/<method>/...): keep the folder skeleton, ignore
-# run artifacts (checkpoints, caches, figures). Commit specific metrics by adding
-# an explicit "!results/.../metrics.json" exception if needed.
+# Unified results tree (results/<method>/...): ignore by default; track lightweight
+# artifacts (metrics, logs, configs, comparison plots). Checkpoints (*.pt) stay
+# ignored globally — use scripts/git_add_results.sh to force-add any result file
+# under the size limit (default 50MB).
 results/**
-!results/
-!results/*/
-!results/**/.gitkeep
+!results/**/
+!results/**/metrics.json
+!results/**/metrics_*.json
+!results/**/config.yaml
+!results/**/train_log.csv
+!results/**/logs/
+!results/**/logs/**
+!results/**/predictions*.csv
+!results/comparison/
+!results/comparison/**
 
 # Local demo / paper assets
 *.pdf
@@ -38,6 +46,12 @@ logs/
 checkpoints/
 runs/
 
+# Re-allow results/ subpaths overridden by logs/, checkpoints/, *.pt above
+!results/**/logs/
+!results/**/logs/**
+!results/**/checkpoints/
+!results/**/checkpoints/*.pt
+
 # CNN: no vendored deps or large zips in git
 CNN/spectral-history-cnn/.pydeps_npu/
 
@@ -61,6 +75,7 @@ CNN/spectral-history-cnn/fusion_result.json
 *.ckpt
 *.h5
 *.hdf5
+!results/**/checkpoints/*.pt
 
 # Archives
 *.tar.gz

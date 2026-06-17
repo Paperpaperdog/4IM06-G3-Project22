@@ -1,0 +1,115 @@
+{
+  "accuracy": 0.6278333333333334,
+  "confusion_matrix": [
+    [
+      310,
+      413,
+      70,
+      172,
+      30,
+      5
+    ],
+    [
+      95,
+      705,
+      62,
+      68,
+      28,
+      42
+    ],
+    [
+      146,
+      81,
+      165,
+      567,
+      38,
+      3
+    ],
+    [
+      108,
+      51,
+      150,
+      677,
+      10,
+      4
+    ],
+    [
+      0,
+      11,
+      30,
+      0,
+      949,
+      10
+    ],
+    [
+      0,
+      0,
+      38,
+      0,
+      1,
+      961
+    ]
+  ],
+  "classification_report": {
+    "original": {
+      "precision": 0.47040971168437024,
+      "recall": 0.31,
+      "f1-score": 0.3737191078963231,
+      "support": 1000
+    },
+    "JPEG_Q80": {
+      "precision": 0.5590800951625694,
+      "recall": 0.705,
+      "f1-score": 0.6236178681999116,
+      "support": 1000
+    },
+    "downsample_x8": {
+      "precision": 0.32038834951456313,
+      "recall": 0.165,
+      "f1-score": 0.21782178217821785,
+      "support": 1000
+    },
+    "downsample_x16": {
+      "precision": 0.45619946091644203,
+      "recall": 0.677,
+      "f1-score": 0.5450885668276971,
+      "support": 1000
+    },
+    "upsample_x4": {
+      "precision": 0.8986742424242424,
+      "recall": 0.949,
+      "f1-score": 0.9231517509727626,
+      "support": 1000
+    },
+    "upsample_x8": {
+      "precision": 0.937560975609756,
+      "recall": 0.961,
+      "f1-score": 0.9491358024691359,
+      "support": 1000
+    },
+    "macro avg": {
+      "precision": 0.6070521392186573,
+      "recall": 0.6278333333333334,
+      "f1-score": 0.6054224797573413,
+      "support": 6000
+    },
+    "weighted avg": {
+      "precision": 0.6070521392186572,
+      "recall": 0.6278333333333334,
+      "f1-score": 0.6054224797573414,
+      "support": 6000
+    }
+  },
+  "metrics_warning": "sklearn metrics unavailable or failed: No module named 'sklearn'",
+  "one_vs_rest_auc": {
+    "original": null,
+    "JPEG_Q80": null,
+    "downsample_x8": null,
+    "downsample_x16": null,
+    "upsample_x4": null,
+    "upsample_x8": null
+  },
+  "accuracy_by_observed_size": {
+    "64": 0.6278333333333334
+  }
+}

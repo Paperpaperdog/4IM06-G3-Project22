@@ -1,0 +1,45 @@
+# Native-spectrum 6-class spectral mask, observed size 32.
+# Trained per-size separately, so the spectrum keeps its native rFFT resolution
+# (32 x 17) instead of remapping to the shared 512x257 grid. Class set matches
+# the n6 CNN sweep for direct comparison.
+experiment_name: n6_mask_size32
+data_dir: ../data/processed/n6_spectra_size32
+output_dir: ../results/mask/n6_mask_size32
+
+num_classes: 6
+class_names:
+  - original
+  - JPEG_Q80
+  - downsample_x8
+  - downsample_x16
+  - upsample_x4
+  - upsample_x8
+
+observed_sizes:
+  - 32
+
+spectrum:
+  native: true
+  channels: 1
+  height: 32
+  width_rfft: 17
+
+model:
+  type: spectral_mask_classifier
+  init_mask_logits: 0.0
+  init_reference_std: 0.02
+  lambda_mask_l1: 0.0
+
+training:
+  device: npu
+  npu_visible_devices: "0"
+  batch_size: 64
+  epochs: 30
+  optimizer: AdamW
+  lr: 0.001
+  weight_decay: 0.0001
+  scheduler: cosine
+  seed: 123
+  num_workers: 4
+  pin_memory: true
+  save_best_by: val_loss
