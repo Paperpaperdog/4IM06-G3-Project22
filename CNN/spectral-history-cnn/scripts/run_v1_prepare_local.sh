@@ -7,6 +7,9 @@ cd "$ROOT"
 export PYTHONPATH=.
 export CNN_ROOT="$ROOT"
 
+# shellcheck disable=SC1091
+source "$ROOT/scripts/resolve_prepare_python.sh"
+
 CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
 RAISE_DIR="${RAISE_DIR:-../../spectral-mask-resampling/data/raw/raise_tiff}"
 SPLIT_JSON="${SPLIT_JSON:-data/splits/raise_split_seed123_local.json}"
@@ -29,7 +32,7 @@ echo "Using local RAISE cache: $RAISE_DIR ($tiff_count TIFF files)"
 
 mkdir -p data/splits
 
-python src/data/split_raise.py \
+"$PREP_PY" src/data/split_raise.py \
   --input-dir "$RAISE_DIR" \
   --output-json "$SPLIT_JSON" \
   --train 700 \
@@ -37,7 +40,7 @@ python src/data/split_raise.py \
   --test 150 \
   --seed 123
 
-python src/data/preprocess_spectra.py \
+"$PREP_PY" src/data/preprocess_spectra.py \
   --config "$CONFIG" \
   --raise-dir "$RAISE_DIR" \
   --image-cache-dir "$RAISE_DIR" \

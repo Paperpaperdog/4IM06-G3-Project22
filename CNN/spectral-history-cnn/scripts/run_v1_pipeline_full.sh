@@ -17,21 +17,6 @@ STATUS_FILE="${LOG_DIR}/pipeline_full.status"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 status() { echo "$1" > "$STATUS_FILE"; log "$1"; }
 
-venv_has_torch() {
-  "$1/bin/python" -c "import torch" >/dev/null 2>&1
-}
-
-activate_cpu_venv() {
-  if [[ -d "$ROOT/.venv" ]] && venv_has_torch "$ROOT/.venv"; then
-    # shellcheck disable=SC1091
-    source "$ROOT/.venv/bin/activate"
-  elif [[ -d "$ROOT/../../spectral-mask-resampling/.venv" ]] \
-    && venv_has_torch "$ROOT/../../spectral-mask-resampling/.venv"; then
-    # shellcheck disable=SC1091
-    source "$ROOT/../../spectral-mask-resampling/.venv/bin/activate"
-  fi
-}
-
 export DEVICE="${DEVICE:-npu}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
 export WORKERS="${WORKERS:-18}"
@@ -41,14 +26,15 @@ log "config=$CONFIG raise_dir=$RAISE_DIR device=$DEVICE"
 
 if [[ "${SKIP_PREPARE:-0}" != "1" ]]; then
   status "prepare"
-  activate_cpu_venv
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/resolve_prepare_python.sh" 2>&1 | tee -a "$LOG_FILE"
   CONFIG="$CONFIG" RAISE_DIR="$RAISE_DIR" LIMIT_SAMPLES="${LIMIT_SAMPLES:-}" WORKERS="$WORKERS" \
-    bash "$ROOT/scripts/run_v1_prepare_local.sh" 2>&1 | tee -a "$LOG_FILE"
+    PREP_PY="$PREP_PY" bash "$ROOT/scripts/run_v1_prepare_local.sh" 2>&1 | tee -a "$LOG_FILE"
 else
   log "SKIP_PREPARE=1, using existing processed data"
 fi
 
-# Do not pipe `source` — pipeline subshell drops PYTHONPATH from ensure_npu_deps.
+export DEVICE="${DEVICE:-npu}"
 # shellcheck disable=SC1091
 source "$ROOT/scripts/activate_python.sh" >> "$LOG_FILE" 2>&1
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}."

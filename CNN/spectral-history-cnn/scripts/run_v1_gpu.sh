@@ -22,6 +22,9 @@ fi
 export WORKERS="${WORKERS:-18}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
 export RESUME="${RESUME:-}"
+# CPU prepare on NPU nodes needs mask venv (scikit-image); pass through to pipeline.
+repo_for_venv="$(cd "$ROOT/../.." && pwd)"
+export VENV_DIR="${VENV_DIR:-${repo_for_venv/-integration/}/spectral-mask-resampling/.venv}"
 
 TS="$(date +%Y%m%d_%H%M%S)"
 export LOG_DIR="${LOG_DIR:-$ROOT/logs}"
@@ -30,7 +33,7 @@ LOG_FILE="${LOG_DIR}/vc_npu_${TS}.log"
 
 echo "[$(date '+%F %T')] run_v1_gpu (NPU) start" | tee "$LOG_FILE"
 echo "ROOT=$ROOT CONFIG=$CONFIG DEVICE=$DEVICE ASCEND_RT_VISIBLE_DEVICES=$ASCEND_RT_VISIBLE_DEVICES" | tee -a "$LOG_FILE"
-echo "RAISE_DIR=$RAISE_DIR SKIP_PREPARE=$SKIP_PREPARE RESUME=${RESUME:-none} WORKERS=$WORKERS" | tee -a "$LOG_FILE"
+echo "RAISE_DIR=$RAISE_DIR VENV_DIR=$VENV_DIR SKIP_PREPARE=$SKIP_PREPARE RESUME=${RESUME:-none} WORKERS=$WORKERS" | tee -a "$LOG_FILE"
 
 if [[ ! -f "$ROOT/$CONFIG" ]]; then
   echo "ERROR: config not found: $ROOT/$CONFIG" | tee -a "$LOG_FILE" >&2

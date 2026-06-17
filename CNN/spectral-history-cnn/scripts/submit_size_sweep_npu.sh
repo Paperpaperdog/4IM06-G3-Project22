@@ -15,6 +15,8 @@ RAISE_DIR="${RAISE_DIR:-$REPO_ROOT/spectral-mask-resampling/data/raw/raise_tiff}
 if [[ ! -d "$RAISE_DIR" && -d "${REPO_ROOT/-integration/}/spectral-mask-resampling/data/raw/raise_tiff" ]]; then
   RAISE_DIR="${REPO_ROOT/-integration/}/spectral-mask-resampling/data/raw/raise_tiff"
 fi
+# CPU prepare needs scikit-image; reuse the mask project venv on this cluster.
+VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
 CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
 SIZES="${SIZES:-32 64 96 128}"
 EPOCHS="${EPOCHS:-50}"
@@ -36,6 +38,7 @@ for size in $SIZES; do
   cd "$CODES"
   CNN_ROOT="$CNN_ROOT" \
   RAISE_DIR="$RAISE_DIR" \
+  VENV_DIR="$VENV_DIR" \
   CONFIG="$cfg" \
   EPOCHS="$EPOCHS" \
   SKIP_PREPARE="$SKIP_PREPARE" \
