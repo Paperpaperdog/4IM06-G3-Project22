@@ -1,0 +1,107 @@
+{
+  "accuracy": 0.7741666666666667,
+  "per_class": {
+    "original": {
+      "precision": 0.7475,
+      "recall": 0.897,
+      "f1": 0.8154545454545454,
+      "support": 1000
+    },
+    "JPEG_Q80": {
+      "precision": 0.8789808917197452,
+      "recall": 0.828,
+      "f1": 0.8527291452111225,
+      "support": 1000
+    },
+    "downsample_x8": {
+      "precision": 0.5697674418604651,
+      "recall": 0.147,
+      "f1": 0.23370429252782193,
+      "support": 1000
+    },
+    "downsample_x16": {
+      "precision": 0.5313915857605178,
+      "recall": 0.821,
+      "f1": 0.6451866404715128,
+      "support": 1000
+    },
+    "upsample_x4": {
+      "precision": 0.9958289885297185,
+      "recall": 0.955,
+      "f1": 0.9749872383869321,
+      "support": 1000
+    },
+    "upsample_x8": {
+      "precision": 0.9096715328467153,
+      "recall": 0.997,
+      "f1": 0.9513358778625954,
+      "support": 1000
+    }
+  },
+  "confusion_matrix": [
+    [
+      897,
+      57,
+      7,
+      16,
+      1,
+      22
+    ],
+    [
+      109,
+      828,
+      7,
+      10,
+      0,
+      46
+    ],
+    [
+      125,
+      28,
+      147,
+      698,
+      1,
+      1
+    ],
+    [
+      68,
+      13,
+      97,
+      821,
+      0,
+      1
+    ],
+    [
+      1,
+      15,
+      0,
+      0,
+      955,
+      29
+    ],
+    [
+      0,
+      1,
+      0,
+      0,
+      2,
+      997
+    ]
+  ],
+  "one_vs_rest_auc": {
+    "original": 0.9793051,
+    "JPEG_Q80": 0.9787538000000001,
+    "downsample_x8": 0.8983103000000001,
+    "downsample_x16": 0.9147321,
+    "upsample_x4": 0.9991378,
+    "upsample_x8": 0.9993984
+  },
+  "important_confusion_pairs": {
+    "downsample_x8_as_downsample_x16": 698,
+    "downsample_x16_as_downsample_x8": 97,
+    "original_as_downsample_x8": 7,
+    "downsample_x8_as_original": 125,
+    "original_as_downsample_x16": 16,
+    "downsample_x16_as_original": 68
+  }
+}
