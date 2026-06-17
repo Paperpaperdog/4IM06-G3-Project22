@@ -8,9 +8,10 @@ CONFIG="${CONFIG:-configs/v1_final64_poscnn_local.yaml}"
 RAISE_DIR="${RAISE_DIR:-../../spectral-mask-resampling/data/raw/raise_tiff}"
 LOG_DIR="${ROOT}/logs"
 mkdir -p "$LOG_DIR"
+CONFIG_TAG="$(basename "${CONFIG%.yaml}")"
 
-LOG_FILE="${LOG_DIR}/pipeline_full.log"
-STATUS_FILE="${LOG_DIR}/pipeline_full.status"
+LOG_FILE="${LOG_DIR}/pipeline_${CONFIG_TAG}.log"
+STATUS_FILE="${LOG_DIR}/pipeline_${CONFIG_TAG}.status"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 status() { echo "$1" > "$STATUS_FILE"; log "$1"; }
@@ -56,6 +57,10 @@ from src.utils.device import print_device_info
 print_device_info()
 PY
 
+OUTPUT_DIR="${OUTPUT_DIR:-$(python -c "import sys; sys.path.insert(0,'.'); from src.utils.io import load_yaml; print(load_yaml('${CONFIG}')['paths']['output_dir'])")}"
+CHECKPOINT="${OUTPUT_DIR}/checkpoints/best.pt"
+log "output_dir=$OUTPUT_DIR checkpoint=$CHECKPOINT"
+
 status "train"
 python src/train.py \
   --config "$CONFIG" \
@@ -69,16 +74,16 @@ status "eval"
 python src/evaluate.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
-  --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+  --checkpoint "$CHECKPOINT" \
   --split test 2>&1 | tee -a "$LOG_FILE"
 
 status "visualize"
 python src/visualize.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
-  --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+  --checkpoint "$CHECKPOINT" \
   --split test 2>&1 | tee -a "$LOG_FILE"
 
 status "DONE"
-log "outputs in outputs/v1_final64_poscnn"
+log "outputs in ${OUTPUT_DIR}"
 log "=== CNN v1 pipeline finished ==="
