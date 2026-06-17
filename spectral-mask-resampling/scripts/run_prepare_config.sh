@@ -40,19 +40,34 @@ fi
 mapfile -t _cfg_lines < <("$PY" - "$CONFIG" <<'PY'
 import sys, yaml
 cfg = yaml.safe_load(open(sys.argv[1]))
+spec = cfg.get("spectrum", {}) or {}
 print(cfg["data_dir"])
 print(" ".join(cfg["class_names"]))
 print(" ".join(str(s) for s in cfg["observed_sizes"]))
+print("native" if spec.get("native") else "grid")
+print(spec.get("height", 512))
+print(spec.get("width_rfft", 257))
 PY
 )
 DATA_DIR="${_cfg_lines[0]}"
 CLASSES="${_cfg_lines[1]}"
 OBSERVED_SIZES="${_cfg_lines[2]}"
+SPECTRUM_MODE="${_cfg_lines[3]}"
+SPECTRUM_HEIGHT="${_cfg_lines[4]}"
+SPECTRUM_WIDTH_RFFT="${_cfg_lines[5]}"
 
 echo "CONFIG=$CONFIG"
 echo "DATA_DIR=$DATA_DIR"
 echo "CLASSES=$CLASSES"
 echo "OBSERVED_SIZES=$OBSERVED_SIZES"
+echo "SPECTRUM_MODE=$SPECTRUM_MODE (height=$SPECTRUM_HEIGHT width_rfft=$SPECTRUM_WIDTH_RFFT)"
+
+# Native mode keeps the per-size rFFT resolution; grid mode remaps to 512x257.
+if [[ "$SPECTRUM_MODE" == "native" ]]; then
+  SPECTRUM_ARGS=(--native-spectrum)
+else
+  SPECTRUM_ARGS=(--target-spectrum-height "$SPECTRUM_HEIGHT" --target-spectrum-width-rfft "$SPECTRUM_WIDTH_RFFT")
+fi
 
 if [[ ! -f "${SPLIT_JSON}" ]]; then
   "$PY" src/data/split_raise.py \
@@ -75,8 +90,7 @@ fi
   --residual tv \
   --tv-weight 0.08 \
   --tv-max-iter 30 \
-  --target-spectrum-height 512 \
-  --target-spectrum-width-rfft 257 \
+  "${SPECTRUM_ARGS[@]}" \
   --dc-sigma-bins 3.0 \
   --seed 123 \
   --dtype float16 \

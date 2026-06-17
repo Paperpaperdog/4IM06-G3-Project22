@@ -18,6 +18,9 @@
 #   WORKERS=0               parallel workers (0 = all cores)
 #   FORENSIC_INPUT=...      default: spectral-mask-resampling/data/raw/raise_tiff
 #   FORENSIC_OUT=...        default: test_results/forensic_pp
+#   FORENSIC_LIMIT=100      cap step-1 images (omit = all TIFFs)
+#   CLASS_SET=u7            7-class classical (+ upsample_x8 in forensic dataset)
+#   CLASS_SET=n6            native-spectrum sweep set (upsample factors 4,8)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,7 +40,7 @@ if [[ "${1:-}" == "--detach" ]]; then
   MAIN_LOG="$LOG_DIR/pipeline.log"
   PID_FILE="$LOG_DIR/pipeline.pid"
 
-  nohup env RUN_ID="$RUN_ID" LOG_DIR="$LOG_DIR" \
+  nohup env RUN_ID="$RUN_ID" LOG_DIR="$LOG_DIR" DETACHED=1 PYTHONUNBUFFERED=1 \
     bash "$SCRIPT_DIR/run_classical_pipeline.sh" "$@" \
     >> "$MAIN_LOG" 2>&1 &
   echo $! > "$PID_FILE"
@@ -76,16 +79,33 @@ PID_FILE="$LOG_DIR/pipeline.pid"
 echo $$ > "$PID_FILE"
 
 FORENSIC_INPUT="${FORENSIC_INPUT:-spectral-mask-resampling/data/raw/raise_tiff}"
-FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp}"
-JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep}"
 NFA_OUT="${NFA_OUT:-test_results/classical_size_sweep}"
-UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison}"
 MAX_SIZES="${MAX_SIZES:-32,64,96,128}"
 LIMIT_IMAGES="${LIMIT_IMAGES:-20}"
 WORKERS="${WORKERS:-0}"
 SKIP_NFA="${SKIP_NFA:-0}"
 SKIP_UNIFIED="${SKIP_UNIFIED:-0}"
+FORENSIC_LIMIT="${FORENSIC_LIMIT:-}"
+CLASS_SET="${CLASS_SET:-u6}"
 
+if [[ "$CLASS_SET" == "u7" ]]; then
+  FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp_u7}"
+  JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep_u7}"
+  UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison_u7}"
+  FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-2,4,8}"
+elif [[ "$CLASS_SET" == "n6" ]]; then
+  FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp_n6}"
+  JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep_n6}"
+  UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison_n6}"
+  FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-4,8}"
+else
+  FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp}"
+  JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep}"
+  UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison}"
+  FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-2,4}"
+fi
+
+export PYTHONUNBUFFERED=1
 PY="${PYTHON:-python3}"
 
 PIPELINE_START=$(date +%s)
@@ -93,7 +113,11 @@ STEP_TIMES=()
 
 log() {
   local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
-  echo "$msg" | tee -a "$MAIN_LOG"
+  if [[ "${DETACHED:-}" == "1" ]]; then
+    echo "$msg"
+  else
+    echo "$msg" | tee -a "$MAIN_LOG"
+  fi
 }
 
 format_duration() {
@@ -184,7 +208,11 @@ run_step() {
 
   local t0=$(date +%s)
   set +e
-  "$@" 2>&1 | tee -a "$step_log" | tee -a "$MAIN_LOG"
+  if [[ "${DETACHED:-}" == "1" ]]; then
+    "$@" 2>&1 | tee -a "$step_log"
+  else
+    "$@" 2>&1 | tee -a "$step_log" | tee -a "$MAIN_LOG"
+  fi
   local rc=${PIPESTATUS[0]}
   set -e
   local t1=$(date +%s)
@@ -213,7 +241,8 @@ log "PROJECT_ROOT=$PROJECT_ROOT"
 log "LOG_DIR=$LOG_DIR"
 log "RAISE_DIR=$RAISE_DIR"
 log "FORENSIC_OUT=$FORENSIC_OUT MAX_SIZES=$MAX_SIZES WORKERS=$WORKERS"
-log "SKIP_NFA=$SKIP_NFA SKIP_UNIFIED=$SKIP_UNIFIED LIMIT_IMAGES=$LIMIT_IMAGES"
+log "SKIP_NFA=$SKIP_NFA SKIP_UNIFIED=$SKIP_UNIFIED LIMIT_IMAGES=$LIMIT_IMAGES CLASS_SET=$CLASS_SET"
+log "FORENSIC_UPSAMPLE_FACTORS=$FORENSIC_UPSAMPLE_FACTORS"
 log "Planned steps: $TOTAL_STEPS"
 
 if [[ ! -d "$RAISE_DIR" ]]; then
@@ -224,13 +253,19 @@ fi
 STEP=1
 
 # Step 1: forensic post-process dataset
-run_step "$STEP" "forensic_dataset" "$TOTAL_STEPS" \
-  "$PY" create_forensic_postprocess_dataset.py \
-    --input_dir "$RAISE_DIR" \
-    --output_dir "$FORENSIC_OUT" \
-    --include_original \
-    --include_upsampling \
-    --mix_order both
+_forensic_args=(
+  "$PY" -u create_forensic_postprocess_dataset.py
+  --input_dir "$RAISE_DIR"
+  --output_dir "$FORENSIC_OUT"
+  --include_original
+  --include_upsampling
+  --mix_order both
+  --upsample_factors "$FORENSIC_UPSAMPLE_FACTORS"
+)
+if [[ -n "$FORENSIC_LIMIT" ]]; then
+  _forensic_args+=(--limit "$FORENSIC_LIMIT")
+fi
+run_step "$STEP" "forensic_dataset" "$TOTAL_STEPS" "${_forensic_args[@]}"
 STEP=$((STEP + 1))
 
 # Step 2: DCT-FFT jpeg detector size sweep
@@ -262,6 +297,7 @@ if [[ "$SKIP_UNIFIED" != "1" ]]; then
   run_step "$STEP" "unified_comparison" "$TOTAL_STEPS" \
     "$PY" scripts/analysis/unified_method_comparison.py \
       --sizes "$MAX_SIZES" \
+      --variant "$CLASS_SET" \
       --classical-eval-dir "$JPEG_SWEEP_OUT" \
       --outdir "$UNIFIED_OUT"
 else

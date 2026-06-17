@@ -24,10 +24,14 @@ import matplotlib.pyplot as plt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-METHODS = {
-    "mask": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / "u6_mask_size{size}" / "metrics.json",
-    "cnn": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / "u6_poscnn_size{size}" / "metrics.json",
-}
+
+def method_paths(variant: str) -> dict[str, Path]:
+    if variant not in ("u6", "u7", "n6"):
+        raise ValueError(f"variant must be u6, u7 or n6, got {variant!r}")
+    return {
+        "mask": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / f"{variant}_mask_size{{size}}" / "metrics.json",
+        "cnn": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / f"{variant}_poscnn_size{{size}}" / "metrics.json",
+    }
 
 
 def macro_f1(metrics: dict) -> float | None:
@@ -49,15 +53,22 @@ def macro_f1(metrics: dict) -> float | None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sizes", default="32,64,96,128")
-    parser.add_argument("--outdir", type=Path, default=PROJECT_ROOT / "test_results" / "size_effect")
+    parser.add_argument("--variant", default="u6", choices=["u6", "u7", "n6"],
+                        help="u6=6-class main sweep; u7=adds upsample_x8 (7 classes); "
+                             "n6=native-spectrum 6-class set (ds8/ds16/up4/up8).")
+    parser.add_argument("--outdir", type=Path, default=None)
     args = parser.parse_args()
+
+    methods = method_paths(args.variant)
+    _suffix = {"u7": "_u7", "n6": "_n6"}.get(args.variant, "")
+    args.outdir = args.outdir or (PROJECT_ROOT / "test_results" / f"size_effect{_suffix}")
 
     sizes = [int(s) for s in args.sizes.split(",") if s.strip()]
     args.outdir.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []
-    series: dict[str, dict[int, float]] = {m: {} for m in METHODS}
-    for method, template in METHODS.items():
+    series: dict[str, dict[int, float]] = {m: {} for m in methods}
+    for method, template in methods.items():
         for size in sizes:
             path = Path(str(template).format(size=size))
             if not path.exists():

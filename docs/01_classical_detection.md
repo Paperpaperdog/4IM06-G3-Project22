@@ -437,3 +437,23 @@ python scripts/analysis/jpeg_detector_size_sweep.py \
 python scripts/analysis/unified_method_comparison.py --sizes 32,64,96,128
 ```
 输出 `test_results/unified_comparison/unified_comparison.{csv,png}`：三条曲线（classical / mask / cnn）的"重采样检出"二分类准确率 vs 输入尺寸；Mask/CNN 的 6 类准确率作为附列保留。`summarize_size_effect.py` 仍提供 B/C 在完整 6 类上的同指标对比。
+
+### 当前主协议 `n6`：一键经典管线
+
+最终主线协议 `n6`（类别 original / JPEG_Q80 / ds×8 / ds×16 / up×4 / up×8，每尺寸单独评估）。经典路线用 `CLASS_SET=n6` 一键跑取证数据集 → DCT-FFT 尺寸扫描 →（可选）NFA 扫描 →（可选）三方法统一对比：
+
+```bash
+cd 4IM06-G3-Project22
+CLASS_SET=n6 bash scripts/analysis/run_classical_pipeline.sh --detach
+# 监控：tail -f test_results/classical_pipeline_logs/latest/pipeline.log
+```
+
+`CLASS_SET=n6` 会自动把上采样因子设为 `4,8`，并写入独立目录
+`test_results/{forensic_pp_n6, jpeg_detector_size_sweep_n6, unified_comparison_n6}`，
+与 `u6`/`u7` 结果互不覆盖。手动跑统一对比：
+
+```bash
+python scripts/analysis/unified_method_comparison.py --variant n6 --sizes 32,64,96,128
+```
+
+> 经典 A-2 的 `resample_x8` 是**分块**重采样，与 Mask/CNN 的全局缩放语义不同；三方法只在「是否重采样」这一二分类轴上严格可比。

@@ -361,3 +361,80 @@ cd ..
 python scripts/analysis/summarize_size_effect.py   # Mask vs CNN：准确率 vs 输入尺寸
 ```
 输出 `test_results/size_effect/size_effect_combined.csv` 与 `size_effect.png`。
+
+---
+
+## 10. 最终协议 `n6`：原生谱 + 每尺寸单独训练（当前主实验）
+
+为让三条路线在**完全一致的设定**下对比，最终采用 `n6` 协议；它与 §9 的 `u6`
+有两点关键区别，已成为当前主线实验（`u6`/`u7` 配置保留作历史对照）。
+
+### 10.1 与 `u6` 的差异
+
+| 项目 | `u6`（§9） | **`n6`（当前）** |
+|------|-----------|------------------|
+| 类别 | original / JPEG_Q80 / ds×8 / ds×16 / **up×2 / up×4** | original / JPEG_Q80 / ds×8 / ds×16 / **up×4 / up×8** |
+| Mask 谱输入 | 统一重采样到 **512×257** 归一化频率网格 | **原生** rFFT 分辨率 \((o,\,o/2{+}1)\)，不再统一 |
+| 训练方式 | 每尺寸单独训 | 每尺寸单独训（不变） |
+| 观测尺寸 | 32 / 64 / 96 / 128 | 32 / 64 / 96 / 128（不变） |
+
+**为什么 Mask 可以用原生谱**：512×257 网格的存在意义，是让**同一个模型**比较不同观测尺寸 \(o\) 的「相同物理频率」。既然 `n6` 对每个 \(o\) **单独训练**，模型只需面对单一尺寸，谱网格无需对齐——直接用原生 rFFT 即可，从而与 CNN 路线（一向用原生 \(o\times(o/2{+}1)\) 谱）的输入表示**对齐**，使两条可学习路线真正可比。
+
+### 10.2 统一 6 类（含更强上采样）
+
+| index | 名称 | 生成方式（观测尺寸 \(o\)） | 源裁切 |
+|-------|------|---------------------------|--------|
+| 0 | `original` | 裁 \(o\) | \(o\) |
+| 1 | `JPEG_Q80` | 裁 \(o\) → JPEG Q80 | \(o\) |
+| 2 | `downsample_x8` | 裁 \(8o\) → resize \(o\) | \(8o\) |
+| 3 | `downsample_x16` | 裁 \(16o\) → resize \(o\) | \(16o\) |
+| 4 | `upsample_x4` | 裁 \(o/4\) → resize \(o\) | \(o/4\) |
+| 5 | `upsample_x8` | 裁 \(o/8\) → resize \(o\) | \(o/8\) |
+
+> `upsample_x8` 在 \(o=32\) 时源裁切 = 4px，正好等于最小裁切下限 `MIN_UPSAMPLE_CROP=4`。
+
+### 10.3 原生谱的代码支持
+
+| 文件 | 改动 |
+|------|------|
+| `src/processing/spectrum.py` | `target_height/width=None` 时**跳过插值**，保留原生 \((o,\,o/2{+}1)\)；DC 抑制按实际谱尺寸计算 |
+| `src/data/preprocess_spectra.py` | 新增 `--native-spectrum`：强制**单一观测尺寸**，自动设谱形状为 \((o,\,o/2{+}1)\)，放开原 512×257 强校验 |
+| `scripts/run_prepare_config.sh` | 读取 config 的 `spectrum.native`，自动选 `--native-spectrum` 或 `--target-spectrum-*` |
+
+`src/train.py` / `src/evaluate.py` 本就按 config 的 `spectrum.height/width_rfft` 建模型，**模型代码零改动**；`u6`/`u7`（512×257 网格）路径完全向后兼容。
+
+各尺寸的原生谱形状：
+
+| \(o\) | 32 | 64 | 96 | 128 |
+|------|-----|-----|-----|-----|
+| 谱 \((H, W_{rfft})\) | (32, 17) | (64, 33) | (96, 49) | (128, 65) |
+
+### 10.4 配置与运行
+
+配置：`configs/size_sweep/n6_mask_size{32,64,96,128}.yaml`（`spectrum.native: true`，
+独立缓存 `data/processed/n6_mask_size*`、输出 `outputs/n6_mask_size*`）。
+
+```bash
+cd spectral-mask-resampling
+
+# 单尺寸完整管线（prepare→train→eval→viz）
+CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh
+
+# 交互节点顺序跑全部尺寸
+SWEEP_TAG=n6 bash scripts/run_size_sweep.sh
+
+# 集群 NPU：每个尺寸一个 vc 作业
+SWEEP_TAG=n6 SIZES="32 64 96 128" bash scripts/submit_size_sweep_npu.sh
+
+# 本地冒烟（验证缓存谱 shape = (N,1,o,o/2+1)）
+LIMIT_IMAGES=4 SAMPLES_PER_CLASS_PER_SIZE=8 \
+  CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh
+```
+
+### 10.5 汇总
+
+```bash
+cd ..
+python scripts/analysis/summarize_size_effect.py --variant n6
+```
+输出 `test_results/size_effect_n6/`（Mask vs CNN 在 `n6` 6 类上的准确率-尺寸曲线）。

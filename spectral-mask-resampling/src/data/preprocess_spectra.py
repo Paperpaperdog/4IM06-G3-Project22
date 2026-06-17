@@ -104,10 +104,18 @@ def process_patch(patch: Image.Image, class_name: str, args: argparse.Namespace)
         img = resize_pil(patch, args.observed_size, args.interpolation)
     y = rgb_to_y_float(img)
     residual = tv_residual(y, weight=args.tv_weight, max_num_iter=args.tv_max_iter)
+    # Native mode keeps the per-size rFFT resolution (no 512x257 remap), so the
+    # observed image is o x o and the spectrum is (o, o//2+1).
+    if getattr(args, "native_spectrum", False):
+        target_height = None
+        target_width_rfft = None
+    else:
+        target_height = args.target_spectrum_height
+        target_width_rfft = args.target_spectrum_width_rfft
     return compute_log_rfft_spectrum(
         residual,
-        target_height=args.target_spectrum_height,
-        target_width_rfft=args.target_spectrum_width_rfft,
+        target_height=target_height,
+        target_width_rfft=target_width_rfft,
         dc_sigma_bins=args.dc_sigma_bins,
     )
 
@@ -254,6 +262,12 @@ def main() -> None:
     parser.add_argument("--tv-max-iter", type=int, default=30)
     parser.add_argument("--target-spectrum-height", type=int, default=512)
     parser.add_argument("--target-spectrum-width-rfft", type=int, default=257)
+    parser.add_argument(
+        "--native-spectrum",
+        action="store_true",
+        help="Keep the native per-size rFFT resolution (o, o//2+1) instead of "
+             "remapping to the 512x257 grid. Requires a single observed size.",
+    )
     parser.add_argument("--dc-sigma-bins", type=float, default=3.0)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--dtype", default="float16")
@@ -273,7 +287,18 @@ def main() -> None:
     # longer hard-coded, so per-size and upsampling experiments are allowed.
     for class_name in args.classes:
         parse_class_spec(class_name)
-    if args.target_spectrum_height != 512 or args.target_spectrum_width_rfft != 257:
+    if args.native_spectrum:
+        # Native spectra differ in shape per observed size, so one cache (one
+        # memmap) can only hold a single size. Per-size sweep configs satisfy this.
+        if len(args.observed_sizes) != 1:
+            raise ValueError(
+                "--native-spectrum requires exactly one observed size per config "
+                f"(got {args.observed_sizes}); use one per-size config each."
+            )
+        o = int(args.observed_sizes[0])
+        args.target_spectrum_height = o
+        args.target_spectrum_width_rfft = o // 2 + 1
+    elif args.target_spectrum_height != 512 or args.target_spectrum_width_rfft != 257:
         raise ValueError("The normalized frequency grid must be [1, 512, 257]")
 
     input_dir = Path(args.input_dir) if args.input_dir else None
@@ -293,6 +318,7 @@ def main() -> None:
         "residual": args.residual,
         "tv_weight": args.tv_weight,
         "tv_max_iter": args.tv_max_iter,
+        "native_spectrum": bool(args.native_spectrum),
         "target_spectrum_height": args.target_spectrum_height,
         "target_spectrum_width_rfft": args.target_spectrum_width_rfft,
         "dc_sigma_bins": args.dc_sigma_bins,

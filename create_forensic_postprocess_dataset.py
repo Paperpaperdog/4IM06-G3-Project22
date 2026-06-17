@@ -273,8 +273,15 @@ def main():
     parser.add_argument(
         "--upsample_factors",
         type=str,
-        default="2,4",
-        help="Comma-separated global up-sampling factors, used with --include_upsampling."
+        default="2,4,8",
+        help="Comma-separated global up-sampling factors (e.g. 2,4 for u6; 2,4,8 for u7).",
+    )
+
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Process at most this many input images (sorted order). Useful for smoke tests.",
     )
 
     args = parser.parse_args()
@@ -291,8 +298,10 @@ def main():
     paths = list_images(input_dir)
     if len(paths) == 0:
         raise RuntimeError(f"No valid images found in {input_dir}")
+    if args.limit is not None:
+        paths = paths[: int(args.limit)]
 
-    print(f"[Info] Found {len(paths)} images.")
+    print(f"[Info] Found {len(paths)} images to process.", flush=True)
     print(f"[Info] Fixed resampling period: x8")
     print(f"[Info] JPEG quality: {args.quality}")
     print(f"[Info] Interpolation: {args.interpolation}")
@@ -372,8 +381,8 @@ def main():
             skipped += 1
             print(f"[Warning] Skipped {path.name}: {e}")
 
-        if (idx + 1) % 50 == 0:
-            print(f"[Info] Processed {idx + 1}/{len(paths)} input images.")
+        if (idx + 1) % 10 == 0 or (idx + 1) == len(paths):
+            print(f"[Info] Processed {idx + 1}/{len(paths)} input images.", flush=True)
 
     print("\n[Done] Dataset post-processing finished.")
     print(f"[Done] Processed images: {processed}")

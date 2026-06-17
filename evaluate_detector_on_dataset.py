@@ -20,6 +20,7 @@ CLASS_MAP = {
     # (out-of-design) up-sampled inputs.
     "upsample_x2": "upsampling",
     "upsample_x4": "upsampling",
+    "upsample_x8": "upsampling",
 }
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}

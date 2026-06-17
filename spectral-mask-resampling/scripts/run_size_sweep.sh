@@ -11,9 +11,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 SIZES="${SIZES:-32 64 96 128}"
+SWEEP_TAG="${SWEEP_TAG:-u6}"
 
 for size in $SIZES; do
-  cfg="configs/size_sweep/u6_mask_size${size}.yaml"
+  cfg="configs/size_sweep/${SWEEP_TAG}_mask_size${size}.yaml"
   if [[ ! -f "$cfg" ]]; then
     echo "SKIP: missing config $cfg" >&2
     continue
@@ -22,5 +23,5 @@ for size in $SIZES; do
   CONFIG="$cfg" bash "$ROOT/scripts/run_pipeline_config.sh"
 done
 
-echo "All mask size-sweep runs finished. Summarize with:"
-echo "  python ../scripts/analysis/summarize_size_effect.py"
+echo "All mask size-sweep runs finished (SWEEP_TAG=$SWEEP_TAG). Summarize with:"
+echo "  python ../scripts/analysis/summarize_size_effect.py --variant $SWEEP_TAG"

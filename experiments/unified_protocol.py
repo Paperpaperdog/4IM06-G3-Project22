@@ -19,6 +19,7 @@ Design choices (agreed with the user):
   JPEG_Q80             crop o x o, JPEG encode/decode at quality 80
   upsample_x2          crop (o/2) x (o/2),  bicubic resize UP to o
   upsample_x4          crop (o/4) x (o/4),  bicubic resize UP to o
+  upsample_x8          crop (o/8) x (o/8),  bicubic resize UP to o  [u7 only]
   downsample_x8        crop (8o) x (8o),    bicubic resize DOWN to o
   downsample_x16       crop (16o) x (16o),  bicubic resize DOWN to o
   ===================  ================================================
@@ -48,14 +49,23 @@ CANONICAL_CLASSES = [
     "downsample_x16",
 ]
 
+# 7-class sweep: u6 set + upsample_x8 (stronger upsampling; crop = o/8).
+# Mask/CNN configs: configs/size_sweep/u7_* ; outputs: u7_mask_size*, u7_poscnn_size*.
+CANONICAL_CLASSES_U7 = [
+    "original",
+    "JPEG_Q80",
+    "downsample_x8",
+    "downsample_x16",
+    "upsample_x2",
+    "upsample_x4",
+    "upsample_x8",
+]
+
 OBSERVED_SIZES = [32, 48, 64, 96, 128]
 
 DEFAULT_JPEG_QUALITY = 80
 
-# Signed rescale factor per class.  >1 means the source patch is larger than the
-# observation (downsample); <1 (encoded as the reciprocal) means upsample.
-# We store the integer magnitude and a direction flag instead, see helpers below.
-_UPSAMPLE_FACTORS = {"upsample_x2": 2, "upsample_x4": 4}
+_UPSAMPLE_FACTORS = {"upsample_x2": 2, "upsample_x4": 4, "upsample_x8": 8}
 _DOWNSAMPLE_FACTORS = {"downsample_x8": 8, "downsample_x16": 16}
 
 _BICUBIC = Image.Resampling.BICUBIC

@@ -359,3 +359,44 @@ cd ../..
 python scripts/analysis/summarize_size_effect.py
 ```
 输出 `test_results/size_effect/`（CSV + 准确率-尺寸曲线，Mask 与 CNN 同图对比）。
+
+---
+
+## 11. 最终协议 `n6`：与 Mask 原生谱对齐（当前主实验）
+
+`n6` 是当前主线协议，CNN 与 Mask 在**完全一致的设定**下对比：每尺寸单独训练、
+**原生** rFFT 谱、同一套 6 类。CNN 一向用原生谱 \(o\times(o/2{+}1)\)，因此本路线
+改动很小，主要是换类别集合。
+
+### 11.1 类别集合（相对 `u6` 的变化）
+
+| `u6`（§10） | **`n6`（当前）** |
+|-------------|------------------|
+| original / JPEG_Q80 / ds×8 / ds×16 / **up×2 / up×4** | original / JPEG_Q80 / ds×8 / ds×16 / **up×4 / up×8** |
+
+去掉 `upsample_x2`、加入更强的 `upsample_x8`（源裁切 \(o/8\)，\(o=32\) 时为 4px）。
+`src/data/preprocess_spectra.py` 的 `class_crop_size` / `parse_class_spec` 已通用支持
+`upsample_x8`，无需额外改动。
+
+### 11.2 配置与运行
+
+配置：`configs/size_sweep/n6_poscnn_size{32,64,96,128}.yaml`（`num_classes: 6`，
+独立缓存 `data/processed/n6_tv_rfft_size*`、输出 `outputs/n6_poscnn_size*`）。
+
+```bash
+cd CNN/spectral-history-cnn
+
+# 交互节点顺序跑全部尺寸
+SWEEP_TAG=n6 bash scripts/run_size_sweep.sh
+
+# 集群 NPU：每个尺寸一个 vc 作业
+SWEEP_TAG=n6 SKIP_PREPARE=0 SIZES="32 64 96 128" bash scripts/submit_size_sweep_npu.sh
+```
+
+### 11.3 汇总
+
+```bash
+cd ../..
+python scripts/analysis/summarize_size_effect.py --variant n6
+python scripts/analysis/unified_method_comparison.py --variant n6
+```
