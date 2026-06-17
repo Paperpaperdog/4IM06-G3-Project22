@@ -11,8 +11,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
+export PYTHONPATH=.
 
 CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/u6_mask_size64.yaml}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
@@ -34,6 +34,10 @@ if [[ "$SKIP_PREPARE" != "1" ]]; then
   PREP_PY="${PYTHON:-python3}"
   log "prepare python: $PREP_PY"
   CONFIG="$CONFIG" PYTHON="$PREP_PY" bash "$ROOT/scripts/run_prepare_config.sh" 2>&1 | tee -a "$LOG_FILE"
+  # CPU venv must be torn down before NPU train (otherwise CANN/tbe init fails).
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    deactivate 2>/dev/null || true
+  fi
 else
   log "SKIP_PREPARE=1, using existing cache"
 fi

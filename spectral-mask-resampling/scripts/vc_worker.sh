@@ -6,13 +6,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
+# PYTHONPATH is set per-phase in run_pipeline_config.sh (CPU prepare vs NPU train).
 
 export CONFIG="${CONFIG:-configs/u6_mask_combined.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
-export PYTHONNOUSERSITE=1
 
 TS="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="${LOG_DIR:-$ROOT/logs}"

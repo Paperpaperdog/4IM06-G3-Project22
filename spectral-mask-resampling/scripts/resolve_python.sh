@@ -52,28 +52,45 @@ resolve_cpu() {
 }
 
 resolve_npu() {
-  export PYTHONNOUSERSITE=1
-  NPU_ENV="$ROOT/../../CNN/spectral-history-cnn/scripts/setup_npu_env.sh"
-  if [[ -f "$NPU_ENV" ]]; then
-    # shellcheck disable=SC1091
-    source "$NPU_ENV" || true
+  # Leave the CPU venv used for prepare — it shadows CANN/tbe on NPU nodes.
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    deactivate 2>/dev/null || true
   fi
-  for py in "${PYTHON:-}" python3 /usr/local/python3.10.15/bin/python3; do
-    [[ -n "$py" ]] || continue
-    command -v "$py" >/dev/null 2>&1 || [[ -x "$py" ]] || continue
-    if PYTHONNOUSERSITE=1 "$py" -c "import torch_npu; import torch; assert torch.npu.is_available()" >/dev/null 2>&1; then
-      export PYTHON="$py"
-      echo "Using NPU python: $py"
-      ENSURE="$ROOT/../../CNN/spectral-history-cnn/scripts/ensure_npu_deps.sh"
-      if [[ -f "$ENSURE" ]]; then
-        # shellcheck disable=SC1091
-        source "$ENSURE" "$py" || true
-      fi
-      return 0
+  unset PYTHONPATH
+
+  export PYTHONNOUSERSITE=1
+  export DEVICE=npu
+
+  local activate="$ROOT/../../CNN/spectral-history-cnn/scripts/activate_python.sh"
+  if [[ ! -f "$activate" ]]; then
+    echo "ERROR: CNN activate_python.sh not found: $activate" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1091
+  source "$activate"
+
+  local py="${PYTHON:-python3}"
+  # Mask src/ imports still need the project root on PYTHONPATH.
+  export PYTHONPATH=".${PYTHONPATH:+:$PYTHONPATH}"
+
+  if ! PYTHONNOUSERSITE=1 "$py" -c "import tbe" >/dev/null 2>&1; then
+    echo "WARN: tbe not on PYTHONPATH; re-sourcing Ascend set_env.sh" >&2
+    if [[ -f /usr/local/Ascend/ascend-toolkit/set_env.sh ]]; then
+      # shellcheck disable=SC1091
+      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      export PYTHONPATH=".${PYTHONPATH:+:$PYTHONPATH}"
     fi
-  done
-  echo "WARN: torch_npu not found; falling back to CPU venv (train will fail on NPU config)." >&2
-  resolve_cpu
+  fi
+
+  if PYTHONNOUSERSITE=1 "$py" -c "import tbe; import torch_npu; import torch; assert torch.npu.is_available()" >/dev/null 2>&1; then
+    export PYTHON="$py"
+    echo "Using NPU python (CANN+tbe ready): $py"
+    return 0
+  fi
+
+  echo "ERROR: NPU python missing tbe/torch_npu. Source Ascend env on the compute node." >&2
+  PYTHONNOUSERSITE=1 "$py" -c "import sys; print('PYTHONPATH', sys.path[:5])" 2>&1 || true
+  return 1
 }
 
 case "$MODE" in
