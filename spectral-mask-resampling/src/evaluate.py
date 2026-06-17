@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -12,7 +11,11 @@ from src.models.spectral_mask_classifier import SpectralMaskClassifier
 from src.utils.device import resolve_device, setup_device_env
 from src.utils.io import ensure_dir, load_config, save_json
 from src.utils.metrics import compute_metrics
-from src.utils.plots import save_confusion_matrix
+
+try:
+    from src.utils.plots import save_confusion_matrix
+except ImportError:
+    save_confusion_matrix = None
 
 
 def load_model(config: dict, checkpoint_path: str | Path, device: torch.device) -> SpectralMaskClassifier:
@@ -74,13 +77,25 @@ def main() -> None:
         mask = np.asarray(observed_sizes) == observed_size
         size_metrics = compute_metrics(y_true[mask], y_pred[mask], probs[mask], config["class_names"])
         metrics["accuracy_by_observed_size"][str(observed_size)] = size_metrics["accuracy"]
-        save_confusion_matrix(
-            np.asarray(size_metrics["confusion_matrix"]),
-            config["class_names"],
-            by_size_dir / f"confusion_matrix_observed_size_{observed_size}.png",
-        )
+        if save_confusion_matrix is not None:
+            try:
+                save_confusion_matrix(
+                    np.asarray(size_metrics["confusion_matrix"]),
+                    config["class_names"],
+                    by_size_dir / f"confusion_matrix_observed_size_{observed_size}.png",
+                )
+            except Exception as exc:
+                print(f"WARN: could not save confusion matrix for size {observed_size}: {exc}")
     save_json(metrics, output_dir / "metrics.json")
-    save_confusion_matrix(np.asarray(metrics["confusion_matrix"]), config["class_names"], figures_dir / "confusion_matrix.png")
+    if save_confusion_matrix is not None:
+        try:
+            save_confusion_matrix(
+                np.asarray(metrics["confusion_matrix"]),
+                config["class_names"],
+                figures_dir / "confusion_matrix.png",
+            )
+        except Exception as exc:
+            print(f"WARN: could not save confusion matrix plot: {exc}")
 
     rows = {
         "index": np.arange(len(y_true)),
@@ -90,7 +105,13 @@ def main() -> None:
     }
     for idx, name in enumerate(config["class_names"]):
         rows[f"prob_{name}"] = probs[:, idx]
-    pd.DataFrame(rows).to_csv(output_dir / f"predictions_{args.split}.csv", index=False)
+    try:
+        import pandas as pd
+
+        pd.DataFrame(rows).to_csv(output_dir / f"predictions_{args.split}.csv", index=False)
+    except ImportError:
+        np.savez_compressed(output_dir / f"predictions_{args.split}.npz", **rows)
+        print(f"WARN: pandas unavailable; saved {output_dir / f'predictions_{args.split}.npz'}")
     print(f"{args.split}_accuracy={metrics['accuracy']:.6f}")
 
 

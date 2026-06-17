@@ -67,10 +67,13 @@ log "train"
 "$PY" src/train.py --config "$CONFIG" 2>&1 | tee -a "$LOG_FILE"
 
 log "eval"
-"$PY" src/evaluate.py --config "$CONFIG" --checkpoint "$CKPT" --split test 2>&1 | tee -a "$LOG_FILE"
-
-log "visualize"
-"$PY" src/visualize.py --config "$CONFIG" --checkpoint "$CKPT" 2>&1 | tee -a "$LOG_FILE" || \
-  log "WARN: visualize skipped (optional plotting deps missing)"
+if "$PY" src/evaluate.py --config "$CONFIG" --checkpoint "$CKPT" --split test 2>&1 | tee -a "$LOG_FILE"; then
+  log "visualize"
+  "$PY" src/visualize.py --config "$CONFIG" --checkpoint "$CKPT" 2>&1 | tee -a "$LOG_FILE" || \
+    log "WARN: visualize skipped (optional plotting deps missing)"
+else
+  log "WARN: eval failed — see log above"
+  exit 1
+fi
 
 log "=== mask pipeline done -> $OUTPUT_DIR ==="
