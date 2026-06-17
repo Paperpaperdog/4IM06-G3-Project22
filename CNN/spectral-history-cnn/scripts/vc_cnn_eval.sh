@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Submit CNN test eval to a CPU compute node (no NPU). Copy to ~/Codes/vc_cnn_eval.sh.
+# Optional: submit CNN test eval via vc (CPU, gpu-per-task 0).
+# Prefer direct run on debug/login node instead:
+#   bash scripts/run_cnn_eval_all.sh
 #
-#   REPO_ROOT=.../4IM06-G3-Project22-integration \
-#   CONFIG=configs/size_sweep/n6_poscnn_size64.yaml \
-#   JOB=n6_cnn_eval_size64 \
-#   bash ~/Codes/vc_cnn_eval.sh
+# Copy to ~/Codes/vc_cnn_eval.sh only if you need detached vc jobs.
 set -euo pipefail
 
 PARTITION="${PARTITION:-pdgpu-sjtu-ai}"

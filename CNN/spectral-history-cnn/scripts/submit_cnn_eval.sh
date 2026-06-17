@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Submit one CPU vc job per size to run test eval on existing CNN checkpoints.
 #
+# CPU eval does NOT require vc — prefer running directly on a login/debug node:
+#   bash scripts/run_cnn_eval_all.sh
+#
+# Use vc only if you want detached batch jobs (e.g. no shell access):
 #   bash scripts/submit_cnn_eval.sh
 #   SIZES="64 128" bash scripts/submit_cnn_eval.sh
-#
-# Copy scripts/vc_cnn_eval.sh to ~/Codes/vc_cnn_eval.sh first (or set VC_SUBMIT_CMD).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
