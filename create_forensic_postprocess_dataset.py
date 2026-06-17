@@ -230,8 +230,8 @@ def main():
     parser.add_argument(
         "--quality",
         type=int,
-        default=85,
-        help="JPEG quality used for JPEG versions."
+        default=80,
+        help="JPEG quality used for JPEG versions (default 80, aligned with Mask/CNN).",
     )
 
     parser.add_argument(

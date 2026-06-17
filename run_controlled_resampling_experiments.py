@@ -48,7 +48,9 @@ def discover_tiff_paths(image_dir: Path, csv_path: Path | None, limit: int | Non
         for path in image_dir.glob(pattern):
             by_id[image_id(path)] = path
 
-    if csv_path is None:
+    if csv_path is None or not csv_path.is_file():
+        if csv_path is not None and not csv_path.is_file():
+            print(f"[Warn] RAISE CSV not found ({csv_path}); using sorted TIFF filenames.")
         paths = [by_id[key] for key in sorted(by_id)]
     else:
         paths = []

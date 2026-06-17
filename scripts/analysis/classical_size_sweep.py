@@ -16,7 +16,7 @@ Run (CPU):
   cd 4IM06-G3-Project22
   python scripts/analysis/classical_size_sweep.py \
     --image-dir spectral-mask-resampling/data/raw/raise_tiff \
-    --limit-images 20 --target-sizes 256,384,512 --factors 2,4
+    --limit-images 20 --target-sizes 32,64,96,128 --factors 2,4
 """
 
 from __future__ import annotations
@@ -40,6 +40,23 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from run_controlled_resampling_experiments import run_experiment  # noqa: E402
+
+
+def resolve_raise_tiff_dir(image_dir: Path) -> Path:
+    """Resolve RAISE TIFF cache (integration checkout may lack local data/)."""
+    legacy_root = Path(str(PROJECT_ROOT).replace("-integration", ""))
+    for candidate in (
+        image_dir,
+        PROJECT_ROOT / "spectral-mask-resampling" / "data" / "raw" / "raise_tiff",
+        legacy_root / "spectral-mask-resampling" / "data" / "raw" / "raise_tiff",
+    ):
+        if candidate.is_dir():
+            return candidate
+    return image_dir
+
+
+def resolve_raise_csv(raise_csv: Path) -> Path | None:
+    return raise_csv if raise_csv.is_file() else None
 
 
 def parse_int_list(value: str) -> list[int]:
@@ -150,9 +167,11 @@ def main() -> None:
     parser.add_argument("--raise-csv", type=Path, default=Path("data/raise_raw/RAISE_1k.csv"))
     parser.add_argument("--outdir-root", type=Path, default=Path("test_results/classical_size_sweep"))
     parser.add_argument("--limit-images", type=int, default=20)
-    parser.add_argument("--target-sizes", default="256,384,512")
+    parser.add_argument("--target-sizes", default="32,64,96,128",
+                        help="Observed sizes aligned with Mask/CNN size sweep.")
     parser.add_argument("--factors", default="2,4", help="up/down resampling factors")
-    parser.add_argument("--min-source-size", type=int, default=64)
+    parser.add_argument("--min-source-size", type=int, default=16,
+                        help="Minimum source crop; lower values enable upsample cases at small targets.")
     parser.add_argument("--methods", default="bicubic")
     parser.add_argument("--radius", type=int, default=10)
     parser.add_argument("--tv-weight", type=float, default=1.0)
@@ -164,6 +183,9 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=0,
                         help="Parallel workers across images per target (0 = all cores).")
     args = parser.parse_args()
+
+    args.image_dir = resolve_raise_tiff_dir(args.image_dir)
+    args.raise_csv = resolve_raise_csv(args.raise_csv)
 
     target_sizes = parse_int_list(args.target_sizes)
     factors = parse_int_list(args.factors)

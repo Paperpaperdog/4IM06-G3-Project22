@@ -57,6 +57,10 @@ def run_one(detector: Path, evaluator: Path, dataset_root: Path, null_dir: Path,
     print(f"=== max_size={max_size} ===")
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     print(proc.stdout[-2000:])
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"evaluate_detector_on_dataset failed for max_size={max_size} (exit {proc.returncode})"
+        )
     acc_m = ACC_RE.findall(proc.stdout)
     bin_m = BIN_RE.findall(proc.stdout)
     acc = float(acc_m[-1]) if acc_m else None
@@ -70,7 +74,8 @@ def main() -> None:
     parser.add_argument("--evaluator", type=Path, default=PROJECT_ROOT / "evaluate_detector_on_dataset.py")
     parser.add_argument("--dataset-root", type=Path, required=True)
     parser.add_argument("--null-dir", type=Path, required=True)
-    parser.add_argument("--max-sizes", default="128,256,512")
+    parser.add_argument("--max-sizes", default="32,64,96,128",
+                        help="Input sizes aligned with Mask/CNN/unified_method_comparison.")
     parser.add_argument("--max-per-class", type=int, default=30)
     parser.add_argument("--workers", type=int, default=0,
                         help="Parallel workers passed to the evaluator (0 = all cores).")
@@ -94,14 +99,14 @@ def main() -> None:
         for row in rows:
             writer.writerow(row)
 
-    xs = [r["max_size"] for r in rows if r["accuracy"] is not None]
-    ys = [r["accuracy"] for r in rows if r["accuracy"] is not None]
+    xs = [r["max_size"] for r in rows if r["binary_resampling_accuracy"] is not None]
+    ys = [r["binary_resampling_accuracy"] for r in rows if r["binary_resampling_accuracy"] is not None]
     if xs:
         plt.figure(figsize=(8, 5))
         plt.plot(xs, ys, marker="o")
         plt.xlabel("max_size (input size)")
-        plt.ylabel("Detector accuracy")
-        plt.title("JPEG-vs-resampling detector: input-size effect")
+        plt.ylabel("Binary resampling-detected accuracy")
+        plt.title("JPEG-vs-resampling detector: input-size effect (unified axis)")
         plt.ylim(0, 1)
         plt.grid(True, linestyle=":", alpha=0.6)
         plt.tight_layout()

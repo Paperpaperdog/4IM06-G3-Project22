@@ -10,6 +10,7 @@ from collections import Counter, defaultdict
 CLASS_MAP = {
     "original": "original_or_uncertain",
     "jpeg": "jpeg_compression",
+    "JPEG_Q80": "jpeg_compression",
     "resample_x8": "8x8_resampling",
     "jpeg_then_resample_x8": "mixed",
     "resample_x8_then_jpeg": "mixed",
