@@ -72,10 +72,38 @@ bash spectral-mask-resampling/scripts/download_raise_tiff.sh
 | **C1–C4** | CNN：单尺寸完整管线 | `CNN/spectral-history-cnn/configs/size_sweep/n6_poscnn_size{N}.yaml` | `CNN/spectral-history-cnn/scripts/run_v1_pipeline_full.sh` | `results/cnn/n6_poscnn_size{N}/` |
 | **C-all** | CNN：四尺寸顺序跑 | 同上 4 个 yaml | `CNN/spectral-history-cnn/scripts/run_size_sweep.sh` | 同上 ×4 |
 | **C-HPC** | CNN：集群 NPU 提交 | 同上 4 个 yaml | `CNN/spectral-history-cnn/scripts/submit_size_sweep_npu.sh` | 同上 ×4 |
+| **B+C-HPC** | **一键：预处理 → 等缓存 → Mask+CNN NPU** | 同上 | `scripts/submit_n6_full_pipeline.sh` | 同上 ×4（两方法） |
 | **D** | 汇总：Mask vs CNN 6 类 | — | `scripts/analysis/summarize_size_effect.py` | `results/comparison/size_effect/` |
 | **E** | 汇总：三方法二分轴 | — | `scripts/analysis/unified_method_comparison.py` | `results/comparison/unified_comparison/` |
 
-> **推荐顺序**：先跑 **B + C**（或 HPC 并行提交）→ 再跑 **A**（经典，CPU）→ 最后 **D + E**（需 B/C 的 `metrics.json`；E 还需 A 的 `jpeg_detector_size_sweep`）。
+> **推荐顺序**：先跑 **B + C**（或 HPC 并行提交）→ 再跑 **A**（经典，CPU）→ 最后 **D + E**（需 B/C 的 `metrics.json`；E 还需 A 的 `jpeg_detector_size_sweep`）。  
+> **集群一键**：`bash scripts/submit_n6_full_pipeline.sh --detach`（先 CPU prepare，完成后自动提交 Mask/CNN NPU，见 §5.0）。
+
+### 5.0 集群一键：预处理 → Mask + CNN（推荐 HPC）
+
+前提：`$CODES/vc_prepare_n6.sh`、`$CODES/vc_mask.sh`、`$CODES/vc_cnn_spectral_v1.sh` 已配置好 `VC_SUBMIT_CMD` / `vc submit`。
+
+```bash
+cd 4IM06-G3-Project22
+
+# 登录节点后台：提交 prepare → 轮询缓存 → 提交 4×Mask + 4×CNN NPU
+bash scripts/submit_n6_full_pipeline.sh --detach
+tail -f logs/n6_full_pipeline/pipeline_*.log
+
+# 前台（保持 SSH）
+bash scripts/submit_n6_full_pipeline.sh
+
+# 仅部分尺寸
+SIZES="64 128" bash scripts/submit_n6_full_pipeline.sh --detach
+
+# 缓存已建好，只提交训练
+SKIP_PREPARE_PHASE=1 bash scripts/submit_n6_full_pipeline.sh --train-only
+
+# 在交互 CPU 节点先本地 prepare，再提交 NPU 训练
+bash scripts/submit_n6_full_pipeline.sh --local-prepare
+```
+
+流程：`n6_prepare_size{N}`（CPU）→ 检测 `data/processed/n6_spectra_size{N}/` → `n6_mask_size{N}` + `n6_cnn_size{N}`（NPU，`SKIP_PREPARE=1`）。
 
 ---
 
