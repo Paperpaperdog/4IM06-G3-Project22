@@ -19,7 +19,18 @@ resolve_cpu() {
     echo "Using PYTHON=$PYTHON (cpu/prepare)"
     return 0
   fi
-  for v in "$ROOT/.venv" "$ROOT/../../CNN/spectral-history-cnn/.venv"; do
+  # Search order: explicit VENV_DIR, local .venv, sibling checkout without
+  # "-integration" (common on this cluster), CNN fallback venv.
+  local legacy_root="${ROOT/-integration/}"
+  local -a _venv_candidates=()
+  [[ -n "${VENV_DIR:-}" ]] && _venv_candidates+=("$VENV_DIR")
+  _venv_candidates+=(
+    "$ROOT/.venv"
+    "$legacy_root/.venv"
+    "$ROOT/../../CNN/spectral-history-cnn/.venv"
+  )
+  for v in "${_venv_candidates[@]}"; do
+    [[ -n "$v" ]] || continue
     if venv_ok "$v"; then
       # shellcheck disable=SC1091
       source "$v/bin/activate"
@@ -32,8 +43,11 @@ resolve_cpu() {
     return 0
   fi
   echo "ERROR: no Python with prepare deps (PIL, numpy, torch, skimage, yaml, tqdm)." >&2
-  echo "  On the cluster, create the project venv once:" >&2
-  echo "    cd $ROOT && bash scripts/setup_cpu_venv.sh" >&2
+  echo "  Expected venv at one of:" >&2
+  echo "    $ROOT/.venv" >&2
+  echo "    $legacy_root/.venv" >&2
+  echo "  Or set VENV_DIR=/path/to/.venv and retry." >&2
+  echo "  Create new venv: cd $ROOT && bash scripts/setup_cpu_venv.sh" >&2
   return 1
 }
 
