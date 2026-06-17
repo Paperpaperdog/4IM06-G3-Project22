@@ -1,5 +1,25 @@
 # Spectral Mask Classifier for JPEG vs Downsampling Ambiguity
 
+> **Current protocol: `n6`** — native per-size rFFT spectra, 6 classes
+> (`original / JPEG_Q80 / downsample_x8 / downsample_x16 / upsample_x4 / upsample_x8`),
+> one model trained per observed size. See [`../docs/02_spectral_mask.md`](../docs/02_spectral_mask.md) §9.
+>
+> ```bash
+> # one size, full pipeline (prepare -> train -> eval -> viz), paths from config
+> CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh
+> # all sizes on an interactive node
+> bash scripts/run_size_sweep.sh
+> # one NPU job per size
+> SIZES="32 64 96 128" bash scripts/submit_size_sweep_npu.sh
+> ```
+>
+> The **Version 1** material below documents the original 512×257 normalized-grid
+> experiment. Its results are kept under `outputs/v1_fourier_ambiguity_mask_clean/`,
+> but its configs and `run_v1_*.sh` scripts now live on the `archive/legacy-u6-u7`
+> branch. The sections below are retained as the historical design spec / roadmap.
+
+---
+
 This project studies whether JPEG compression and downsampling leave distinguishable traces in residual Fourier spectra, especially when both operations create similar 8/16-period spectral artifacts.
 
 The main scientific question is not ordinary downsampling-factor classification. The goal is to test whether a Fourier-only learned spectral mask can separate JPEG-specific traces from downsampling-specific traces under a controlled ambiguity setting.

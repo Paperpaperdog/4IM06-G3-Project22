@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Submit ONE NPU job per observed size for the unified 6-class CNN sweep, using
-# the same vc wrapper as the rest of the project (vc_cnn_spectral_v1.sh on the
-# cluster). Mirrors scripts/submit_npu_train.sh / resubmit_parallel_full.sh.
+# Submit ONE NPU job per observed size for the n6 6-class CNN sweep, using the
+# same vc wrapper as the rest of the project (vc_cnn_spectral_v1.sh on the
+# cluster). Classes: original/JPEG_Q80/downsample_x8/x16/upsample_x4/x8.
 #
 #   bash scripts/submit_size_sweep_npu.sh
-#   SWEEP_TAG=u7 bash scripts/submit_size_sweep_npu.sh   # 7-class (+ upsample_x8)
-#   SWEEP_TAG=n6 bash scripts/submit_size_sweep_npu.sh   # native-spectrum 6-class (ds8/ds16/up4/up8)
+#   SIZES="64 128" bash scripts/submit_size_sweep_npu.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,12 +21,6 @@ CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
 SIZES="${SIZES:-32 64 96 128}"
 EPOCHS="${EPOCHS:-50}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
-SWEEP_TAG="${SWEEP_TAG:-u6}"
-
-if [[ "$SWEEP_TAG" != "u6" && "$SWEEP_TAG" != "u7" && "$SWEEP_TAG" != "n6" ]]; then
-  echo "ERROR: SWEEP_TAG must be u6, u7 or n6 (got $SWEEP_TAG)" >&2
-  exit 1
-fi
 
 if [[ ! -d "$CODES" ]]; then
   echo "ERROR: cluster Codes dir not found: $CODES" >&2
@@ -36,7 +29,7 @@ if [[ ! -d "$CODES" ]]; then
 fi
 
 for size in $SIZES; do
-  cfg="configs/size_sweep/${SWEEP_TAG}_poscnn_size${size}.yaml"
+  cfg="configs/size_sweep/n6_poscnn_size${size}.yaml"
   if [[ ! -f "$ROOT/$cfg" ]]; then
     echo "SKIP: missing config $ROOT/$cfg" >&2
     continue
@@ -49,9 +42,9 @@ for size in $SIZES; do
   CONFIG="$cfg" \
   EPOCHS="$EPOCHS" \
   SKIP_PREPARE="$SKIP_PREPARE" \
-  JOB="${SWEEP_TAG}_cnn_size${size}" \
+  JOB="n6_cnn_size${size}" \
   bash vc_cnn_spectral_v1.sh
 done
 
-echo "Submitted CNN size-sweep jobs (SWEEP_TAG=$SWEEP_TAG) for sizes: $SIZES"
+echo "Submitted CNN n6 size-sweep jobs for sizes: $SIZES"
 echo "Monitor with: vc list"

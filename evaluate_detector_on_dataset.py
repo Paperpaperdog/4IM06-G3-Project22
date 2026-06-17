@@ -18,7 +18,6 @@ CLASS_MAP = {
     # Global up-sampling folders produced with --include_upsampling. The detector
     # has no native up-sampling output, so these rows measure how it responds to
     # (out-of-design) up-sampled inputs.
-    "upsample_x2": "upsampling",
     "upsample_x4": "upsampling",
     "upsample_x8": "upsampling",
 }

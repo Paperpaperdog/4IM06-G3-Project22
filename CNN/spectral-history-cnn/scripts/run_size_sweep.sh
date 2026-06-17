@@ -12,11 +12,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 SIZES="${SIZES:-32 64 96 128}"
-SWEEP_TAG="${SWEEP_TAG:-u6}"
 export DEVICE="${DEVICE:-npu}"
 
 for size in $SIZES; do
-  cfg="configs/size_sweep/${SWEEP_TAG}_poscnn_size${size}.yaml"
+  cfg="configs/size_sweep/n6_poscnn_size${size}.yaml"
   if [[ ! -f "$cfg" ]]; then
     echo "SKIP: missing config $cfg" >&2
     continue
@@ -25,5 +24,5 @@ for size in $SIZES; do
   CONFIG="$cfg" bash "$ROOT/scripts/run_v1_pipeline_full.sh"
 done
 
-echo "All CNN size-sweep runs finished (SWEEP_TAG=$SWEEP_TAG). Summarize with:"
-echo "  python ../../scripts/analysis/summarize_size_effect.py --variant $SWEEP_TAG"
+echo "All CNN size-sweep runs finished. Summarize with:"
+echo "  python ../../scripts/analysis/summarize_size_effect.py"

@@ -1,34 +1,28 @@
 #!/usr/bin/env bash
-# Submit ONE NPU job per observed size for the unified 6-class mask sweep.
+# Submit ONE NPU job per observed size for the n6 6-class mask sweep (native
+# per-size rFFT spectrum). Classes: original/JPEG_Q80/downsample_x8/x16/
+# upsample_x4/x8.
 #
 # Like the CNN sweep, this defers to a cluster-side vc wrapper (default name
-# vc_mask_u6.sh, sitting next to vc_cnn_spectral_v1.sh). That wrapper should
+# vc_mask.sh, sitting next to vc_cnn_spectral_v1.sh). That wrapper should
 # `exec` spectral-mask-resampling/scripts/vc_worker.sh with the env it receives.
 #
 #   bash scripts/submit_size_sweep_npu.sh
 #   SIZES="64 128" bash scripts/submit_size_sweep_npu.sh
-#   SWEEP_TAG=u7 bash scripts/submit_size_sweep_npu.sh   # 7-class (+ upsample_x8)
-#   SWEEP_TAG=n6 bash scripts/submit_size_sweep_npu.sh   # native-spectrum 6-class (ds8/ds16/up4/up8)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Project root (parent of spectral-mask-resampling/). Passed to vc_mask_u6.sh so the
+# Project root (parent of spectral-mask-resampling/). Passed to vc_mask.sh so the
 # cluster wrapper finds vc_worker.sh even when the checkout is named e.g.
 # 4IM06-G3-Project22-integration instead of 4IM06-G3-Project22.
 REPO_ROOT="${REPO_ROOT:-$(cd "$ROOT/.." && pwd)}"
 CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
 VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
 CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
-VC_WRAPPER="${VC_WRAPPER:-vc_mask_u6.sh}"
+VC_WRAPPER="${VC_WRAPPER:-vc_mask.sh}"
 SIZES="${SIZES:-32 64 96 128}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
 EVAL_ONLY="${EVAL_ONLY:-0}"
-SWEEP_TAG="${SWEEP_TAG:-u6}"
-
-if [[ "$SWEEP_TAG" != "u6" && "$SWEEP_TAG" != "u7" && "$SWEEP_TAG" != "n6" ]]; then
-  echo "ERROR: SWEEP_TAG must be u6, u7 or n6 (got $SWEEP_TAG)" >&2
-  exit 1
-fi
 
 if [[ ! -d "$CODES" ]]; then
   echo "ERROR: cluster Codes dir not found: $CODES" >&2
@@ -43,7 +37,7 @@ if [[ ! -f "$CODES/$VC_WRAPPER" ]]; then
 fi
 
 for size in $SIZES; do
-  cfg="configs/size_sweep/${SWEEP_TAG}_mask_size${size}.yaml"
+  cfg="configs/size_sweep/n6_mask_size${size}.yaml"
   if [[ ! -f "$ROOT/$cfg" ]]; then
     echo "SKIP: missing config $ROOT/$cfg" >&2
     continue
@@ -56,9 +50,9 @@ for size in $SIZES; do
   CONFIG="$cfg" \
   SKIP_PREPARE="$SKIP_PREPARE" \
   EVAL_ONLY="$EVAL_ONLY" \
-  JOB="${SWEEP_TAG}_mask_size${size}" \
+  JOB="n6_mask_size${size}" \
   bash "$VC_WRAPPER"
 done
 
-echo "Submitted mask size-sweep jobs (SWEEP_TAG=$SWEEP_TAG) for sizes: $SIZES"
+echo "Submitted mask n6 size-sweep jobs for sizes: $SIZES"
 echo "Monitor with: vc list"

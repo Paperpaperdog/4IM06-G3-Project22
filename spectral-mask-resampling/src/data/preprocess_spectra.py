@@ -18,17 +18,18 @@ from src.processing.spectrum import compute_log_rfft_spectrum
 from src.processing.transforms import apply_jpeg_pil, resize_pil, rgb_to_y_float
 
 
-# Unified 6-class set shared with the CNN pipeline (adds upsampling so the two
-# learnable methods are directly comparable). The legacy 4-class set is a subset.
+# n6 protocol: 6-class set shared with the CNN pipeline so the two learnable
+# methods are directly comparable. Each observed size is trained separately and
+# the spectrum keeps its native rFFT resolution (no shared frequency grid).
 CLASS_NAMES = [
     "original",
     "JPEG_Q80",
     "downsample_x8",
     "downsample_x16",
-    "upsample_x2",
     "upsample_x4",
+    "upsample_x8",
 ]
-OBSERVED_SIZES = [128, 96, 64, 48, 32]
+OBSERVED_SIZES = [128, 96, 64, 32]
 
 # Minimum source crop (pixels) for an upsampling class to avoid degenerate crops.
 MIN_UPSAMPLE_CROP = 4
@@ -104,20 +105,8 @@ def process_patch(patch: Image.Image, class_name: str, args: argparse.Namespace)
         img = resize_pil(patch, args.observed_size, args.interpolation)
     y = rgb_to_y_float(img)
     residual = tv_residual(y, weight=args.tv_weight, max_num_iter=args.tv_max_iter)
-    # Native mode keeps the per-size rFFT resolution (no 512x257 remap), so the
-    # observed image is o x o and the spectrum is (o, o//2+1).
-    if getattr(args, "native_spectrum", False):
-        target_height = None
-        target_width_rfft = None
-    else:
-        target_height = args.target_spectrum_height
-        target_width_rfft = args.target_spectrum_width_rfft
-    return compute_log_rfft_spectrum(
-        residual,
-        target_height=target_height,
-        target_width_rfft=target_width_rfft,
-        dc_sigma_bins=args.dc_sigma_bins,
-    )
+    # Native per-size rFFT resolution: observed image is o x o -> (o, o//2+1).
+    return compute_log_rfft_spectrum(residual, dc_sigma_bins=args.dc_sigma_bins)
 
 
 def selected_images(split_data: dict, split: str, limit_images: int | None) -> list[str]:
@@ -184,7 +173,9 @@ def write_split(
     num_classes = len(class_names)
     spc = args.samples_per_class_per_size
     samples = num_classes * len(args.observed_sizes) * spc
-    shape = (samples, 1, args.target_spectrum_height, args.target_spectrum_width_rfft)
+    # Native spectrum: one observed size per cache, shape (o, o//2+1).
+    o = int(args.observed_sizes[0])
+    shape = (samples, 1, o, o // 2 + 1)
 
     spectra_path = output_dir / f"{split}_spectra.npy"
     labels_path = output_dir / f"{split}_labels.npy"
@@ -260,14 +251,6 @@ def main() -> None:
     parser.add_argument("--residual", default="tv")
     parser.add_argument("--tv-weight", type=float, default=0.08)
     parser.add_argument("--tv-max-iter", type=int, default=30)
-    parser.add_argument("--target-spectrum-height", type=int, default=512)
-    parser.add_argument("--target-spectrum-width-rfft", type=int, default=257)
-    parser.add_argument(
-        "--native-spectrum",
-        action="store_true",
-        help="Keep the native per-size rFFT resolution (o, o//2+1) instead of "
-             "remapping to the 512x257 grid. Requires a single observed size.",
-    )
     parser.add_argument("--dc-sigma-bins", type=float, default=3.0)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--dtype", default="float16")
@@ -283,23 +266,16 @@ def main() -> None:
     if args.residual != "tv":
         raise ValueError(f"Unsupported residual: {args.residual}")
     # Validate that every requested class is supported (original / JPEG /
-    # downsample_xN / upsample_xN). Class set, observed sizes and factors are no
-    # longer hard-coded, so per-size and upsampling experiments are allowed.
+    # downsample_xN / upsample_xN).
     for class_name in args.classes:
         parse_class_spec(class_name)
-    if args.native_spectrum:
-        # Native spectra differ in shape per observed size, so one cache (one
-        # memmap) can only hold a single size. Per-size sweep configs satisfy this.
-        if len(args.observed_sizes) != 1:
-            raise ValueError(
-                "--native-spectrum requires exactly one observed size per config "
-                f"(got {args.observed_sizes}); use one per-size config each."
-            )
-        o = int(args.observed_sizes[0])
-        args.target_spectrum_height = o
-        args.target_spectrum_width_rfft = o // 2 + 1
-    elif args.target_spectrum_height != 512 or args.target_spectrum_width_rfft != 257:
-        raise ValueError("The normalized frequency grid must be [1, 512, 257]")
+    # Native spectra differ in shape per observed size, so one cache (one memmap)
+    # holds a single size. Per-size sweep configs satisfy this by construction.
+    if len(args.observed_sizes) != 1:
+        raise ValueError(
+            "Native-spectrum preprocessing requires exactly one observed size per "
+            f"config (got {args.observed_sizes}); use one per-size config each."
+        )
 
     input_dir = Path(args.input_dir) if args.input_dir else None
     output_dir = Path(args.output_dir)
@@ -318,9 +294,9 @@ def main() -> None:
         "residual": args.residual,
         "tv_weight": args.tv_weight,
         "tv_max_iter": args.tv_max_iter,
-        "native_spectrum": bool(args.native_spectrum),
-        "target_spectrum_height": args.target_spectrum_height,
-        "target_spectrum_width_rfft": args.target_spectrum_width_rfft,
+        "native_spectrum": True,
+        "spectrum_height": int(args.observed_sizes[0]),
+        "spectrum_width_rfft": int(args.observed_sizes[0]) // 2 + 1,
         "dc_sigma_bins": args.dc_sigma_bins,
         "seed": args.seed,
         "dtype": args.dtype,

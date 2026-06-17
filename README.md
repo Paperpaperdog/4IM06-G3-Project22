@@ -33,7 +33,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 | 单图 NFA 重采样检测 + NFA 曲线 | `demo_resampling_detection.py` | `python demo_resampling_detection.py img.png` |
 | RAISE 受控数据集 + 候选原图尺寸 | `synthesize_controlled_resampling_dataset.py` | `python synthesize_controlled_resampling_dataset.py 100 --download` |
 | JPEG vs ×8 块重采样（DCT/FFT） | `jpeg_resample_detector.py` | 见下方 A2 |
-| 训练 / 评估 Mask 分类器 | `spectral-mask-resampling/` | `bash scripts/run_v1_train.sh` 等 |
+| 训练 / 评估 Mask 分类器（n6） | `spectral-mask-resampling/` | `CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh` |
 | 训练 / 评估 CNN | `CNN/spectral-history-cnn/` | `bash scripts/run_v1_pipeline_full.sh` |
 | 早期独立工具（仅供参考） | `archive/legacy_test_tools/` | 见 archive README |
 
@@ -93,14 +93,21 @@ python evaluate_detector_on_dataset.py --detector jpeg_resample_detector.py --da
 
 ## 路线 B：Mask（`spectral-mask-resampling/`）
 
-- **配置**：`configs/v1_fourier_ambiguity_mask_clean.yaml`
-- **结果**：`outputs/v1_fourier_ambiguity_mask_clean/`（acc **56.6%**，macro F1 **0.561**）
+当前主协议 `n6`：原生 rFFT 谱、6 类、每个观测尺寸单独训练。
+
+- **配置**：`configs/size_sweep/n6_mask_size{32,64,96,128}.yaml`
+- **输出**：`outputs/n6_mask_size*`
 
 ```bash
 cd spectral-mask-resampling
-bash scripts/run_v1_prepare.sh && bash scripts/run_v1_train.sh && bash scripts/run_v1_eval.sh
-python scripts/plot_mask_results.py
+# 单尺寸完整管线
+CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh
+# 全部尺寸
+bash scripts/run_size_sweep.sh
 ```
+
+历史基线 v1（512×257 网格、4 类，acc **56.6%** / macro F1 **0.561**）结果保留在
+`outputs/v1_fourier_ambiguity_mask_clean/`，配置与脚本见 `archive/legacy-u6-u7` 分支。
 
 详见 [`spectral-mask-resampling/README.md`](spectral-mask-resampling/README.md)。
 

@@ -4,8 +4,8 @@
 # combined config and every per-size sweep config without edits.
 #
 # Examples:
-#   CONFIG=configs/size_sweep/u6_mask_size64.yaml bash scripts/run_pipeline_config.sh
-#   SKIP_PREPARE=1 CONFIG=configs/u6_mask_combined.yaml bash scripts/run_pipeline_config.sh
+#   CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh
+#   EVAL_ONLY=1 CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_pipeline_config.sh
 #   LIMIT_IMAGES=4 SAMPLES_PER_CLASS_PER_SIZE=8 CONFIG=... bash scripts/run_pipeline_config.sh  # smoke
 set -euo pipefail
 
@@ -19,7 +19,7 @@ export REPO_ROOT
 export CNN_ROOT="${CNN_ROOT:-$REPO_ROOT/CNN/spectral-history-cnn}"
 export VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
 
-CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/u6_mask_size64.yaml}"
+CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/n6_mask_size64.yaml}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
 EVAL_ONLY="${EVAL_ONLY:-0}"
 

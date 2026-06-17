@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reference cluster-side vc wrapper for the unified 6-class mask pipeline.
+# Reference cluster-side vc wrapper for the n6 6-class mask pipeline.
 # This is the mask counterpart of vc_cnn_spectral_v1.sh. Copy it next to
 # vc_cnn_spectral_v1.sh in your $CODES directory on the cluster.
 #
@@ -26,11 +26,11 @@ VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}
 WORKER="$MASK_ROOT/scripts/vc_worker.sh"
 
 export REPO_ROOT CNN_ROOT VENV_DIR
-export CONFIG="${CONFIG:-configs/u6_mask_combined.yaml}"
+export CONFIG="${CONFIG:-configs/size_sweep/n6_mask_size64.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
 export EVAL_ONLY="${EVAL_ONLY:-0}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
-JOB="${JOB:-mask_u6}"
+JOB="${JOB:-n6_mask}"
 CPU_PER_TASK="${CPU_PER_TASK:-20}"
 
 if [[ ! -f "$WORKER" ]]; then
@@ -39,7 +39,7 @@ if [[ ! -f "$WORKER" ]]; then
   exit 1
 fi
 
-echo "vc_mask_u6: JOB=$JOB CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE WORKER=$WORKER"
+echo "vc_mask: JOB=$JOB CONFIG=$CONFIG SKIP_PREPARE=$SKIP_PREPARE WORKER=$WORKER"
 echo "  REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR"
 
 # ---------------------------------------------------------------------------

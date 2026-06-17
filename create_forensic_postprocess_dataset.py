@@ -273,8 +273,9 @@ def main():
     parser.add_argument(
         "--upsample_factors",
         type=str,
-        default="2,4,8",
-        help="Comma-separated global up-sampling factors (e.g. 2,4 for u6; 2,4,8 for u7).",
+        default="4,8",
+        help="Comma-separated global up-sampling factors (n6 uses 4,8 to match "
+             "upsample_x4 / upsample_x8).",
     )
 
     parser.add_argument(

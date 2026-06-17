@@ -19,8 +19,10 @@
 #   FORENSIC_INPUT=...      default: spectral-mask-resampling/data/raw/raise_tiff
 #   FORENSIC_OUT=...        default: test_results/forensic_pp
 #   FORENSIC_LIMIT=100      cap step-1 images (omit = all TIFFs)
-#   CLASS_SET=u7            7-class classical (+ upsample_x8 in forensic dataset)
-#   CLASS_SET=n6            native-spectrum sweep set (upsample factors 4,8)
+#
+# n6 protocol: forensic dataset uses upsample factors 4,8 (matching the learnable
+# routes' upsample_x4 / upsample_x8). Classical is compared only on the binary
+# "resampled vs original" axis.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -86,24 +88,10 @@ WORKERS="${WORKERS:-0}"
 SKIP_NFA="${SKIP_NFA:-0}"
 SKIP_UNIFIED="${SKIP_UNIFIED:-0}"
 FORENSIC_LIMIT="${FORENSIC_LIMIT:-}"
-CLASS_SET="${CLASS_SET:-u6}"
-
-if [[ "$CLASS_SET" == "u7" ]]; then
-  FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp_u7}"
-  JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep_u7}"
-  UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison_u7}"
-  FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-2,4,8}"
-elif [[ "$CLASS_SET" == "n6" ]]; then
-  FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp_n6}"
-  JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep_n6}"
-  UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison_n6}"
-  FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-4,8}"
-else
-  FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp}"
-  JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep}"
-  UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison}"
-  FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-2,4}"
-fi
+FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp}"
+JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep}"
+UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison}"
+FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-4,8}"
 
 export PYTHONUNBUFFERED=1
 PY="${PYTHON:-python3}"
@@ -241,8 +229,8 @@ log "PROJECT_ROOT=$PROJECT_ROOT"
 log "LOG_DIR=$LOG_DIR"
 log "RAISE_DIR=$RAISE_DIR"
 log "FORENSIC_OUT=$FORENSIC_OUT MAX_SIZES=$MAX_SIZES WORKERS=$WORKERS"
-log "SKIP_NFA=$SKIP_NFA SKIP_UNIFIED=$SKIP_UNIFIED LIMIT_IMAGES=$LIMIT_IMAGES CLASS_SET=$CLASS_SET"
-log "FORENSIC_UPSAMPLE_FACTORS=$FORENSIC_UPSAMPLE_FACTORS"
+log "SKIP_NFA=$SKIP_NFA SKIP_UNIFIED=$SKIP_UNIFIED LIMIT_IMAGES=$LIMIT_IMAGES"
+log "FORENSIC_UPSAMPLE_FACTORS=$FORENSIC_UPSAMPLE_FACTORS (n6)"
 log "Planned steps: $TOTAL_STEPS"
 
 if [[ ! -d "$RAISE_DIR" ]]; then
@@ -297,7 +285,6 @@ if [[ "$SKIP_UNIFIED" != "1" ]]; then
   run_step "$STEP" "unified_comparison" "$TOTAL_STEPS" \
     "$PY" scripts/analysis/unified_method_comparison.py \
       --sizes "$MAX_SIZES" \
-      --variant "$CLASS_SET" \
       --classical-eval-dir "$JPEG_SWEEP_OUT" \
       --outdir "$UNIFIED_OUT"
 else

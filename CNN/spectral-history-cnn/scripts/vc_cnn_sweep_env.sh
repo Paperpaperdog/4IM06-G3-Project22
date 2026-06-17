@@ -15,9 +15,9 @@ if [[ ! -d "$RAISE_DIR" && -d "${REPO_ROOT/-integration/}/spectral-mask-resampli
 fi
 VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling/.venv}"
 
-export CNN_ROOT RAISE_DIR VENV_DIR CONFIG="${CONFIG:-configs/size_sweep/u6_poscnn_size64.yaml}"
+export CNN_ROOT RAISE_DIR VENV_DIR CONFIG="${CONFIG:-configs/size_sweep/n6_poscnn_size64.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}" EPOCHS="${EPOCHS:-50}" WORKERS="${WORKERS:-18}"
-export JOB="${JOB:-cnn_u6}"
+export JOB="${JOB:-n6_cnn}"
 
 if [[ ! -f "$WORKER" ]]; then
   echo "ERROR: worker not found: $WORKER" >&2

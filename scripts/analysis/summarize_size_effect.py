@@ -1,9 +1,9 @@
-"""Aggregate the unified-class input-size sweep across Mask and CNN.
+"""Aggregate the n6 input-size sweep across Mask and CNN.
 
 Reads the per-size ``metrics.json`` produced by each method's evaluate step and
 produces a single comparison table + plot of test accuracy vs observed input
-size. This is the direct answer to "does input size affect results?", now that
-both learnable methods share the same 6 classes (incl. upsampling).
+size. This is the direct answer to "does input size affect results?": both
+learnable methods share the same 6 classes and native per-size spectra.
 
 Run:
   cd 4IM06-G3-Project22
@@ -25,12 +25,10 @@ import matplotlib.pyplot as plt
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def method_paths(variant: str) -> dict[str, Path]:
-    if variant not in ("u6", "u7", "n6"):
-        raise ValueError(f"variant must be u6, u7 or n6, got {variant!r}")
+def method_paths() -> dict[str, Path]:
     return {
-        "mask": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / f"{variant}_mask_size{{size}}" / "metrics.json",
-        "cnn": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / f"{variant}_poscnn_size{{size}}" / "metrics.json",
+        "mask": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / "n6_mask_size{size}" / "metrics.json",
+        "cnn": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / "n6_poscnn_size{size}" / "metrics.json",
     }
 
 
@@ -53,15 +51,11 @@ def macro_f1(metrics: dict) -> float | None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sizes", default="32,64,96,128")
-    parser.add_argument("--variant", default="u6", choices=["u6", "u7", "n6"],
-                        help="u6=6-class main sweep; u7=adds upsample_x8 (7 classes); "
-                             "n6=native-spectrum 6-class set (ds8/ds16/up4/up8).")
     parser.add_argument("--outdir", type=Path, default=None)
     args = parser.parse_args()
 
-    methods = method_paths(args.variant)
-    _suffix = {"u7": "_u7", "n6": "_n6"}.get(args.variant, "")
-    args.outdir = args.outdir or (PROJECT_ROOT / "test_results" / f"size_effect{_suffix}")
+    methods = method_paths()
+    args.outdir = args.outdir or (PROJECT_ROOT / "test_results" / "size_effect")
 
     sizes = [int(s) for s in args.sizes.split(",") if s.strip()]
     args.outdir.mkdir(parents=True, exist_ok=True)

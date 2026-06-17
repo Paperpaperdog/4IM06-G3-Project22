@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # On-node entrypoint for the mask pipeline on an Ascend NPU compute node.
 # Analogous to CNN/spectral-history-cnn/scripts/run_v1_gpu.sh. A cluster vc
-# wrapper (e.g. vc_mask_u6.sh) should set CONFIG and exec this script.
+# wrapper (e.g. vc_mask.sh) should set CONFIG and exec this script.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,7 +20,7 @@ else
   export RAISE_TIFF_DIR
 fi
 
-export CONFIG="${CONFIG:-configs/u6_mask_combined.yaml}"
+export CONFIG="${CONFIG:-configs/size_sweep/n6_mask_size64.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
 export EVAL_ONLY="${EVAL_ONLY:-0}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"

@@ -8,7 +8,7 @@ This module is the SINGLE SOURCE OF TRUTH for:
    classical detector, the spectral mask classifier and the spectral CNN all
    consume *identical* image inputs at every size.
 
-Design choices (agreed with the user):
+Design choices (n6 protocol):
 
 * Classes are symmetric around "no rescale":
 
@@ -17,16 +17,16 @@ Design choices (agreed with the user):
   ===================  ================================================
   original             crop o x o directly
   JPEG_Q80             crop o x o, JPEG encode/decode at quality 80
-  upsample_x2          crop (o/2) x (o/2),  bicubic resize UP to o
-  upsample_x4          crop (o/4) x (o/4),  bicubic resize UP to o
-  upsample_x8          crop (o/8) x (o/8),  bicubic resize UP to o  [u7 only]
   downsample_x8        crop (8o) x (8o),    bicubic resize DOWN to o
   downsample_x16       crop (16o) x (16o),  bicubic resize DOWN to o
+  upsample_x4          crop (o/4) x (o/4),  bicubic resize UP to o
+  upsample_x8          crop (o/8) x (o/8),  bicubic resize UP to o
   ===================  ================================================
 
-* Observed sizes: ``{32, 48, 64, 96, 128}``.  All divide by 2 and 4 cleanly,
-  and ``16 * 128 = 2048`` still fits a RAISE TIFF, so every (class, size) pair
-  is realizable.
+* Observed sizes: ``{32, 64, 96, 128}``.  Each is trained as a SEPARATE model
+  per route, with its own native rFFT spectrum (no shared frequency grid).
+  ``16 * 128 = 2048`` still fits a RAISE TIFF, so every (class, size) pair is
+  realizable; ``upsample_x8`` at o=32 crops 4 px (the minimum allowed).
 
 The two deep-learning subprojects keep their own spectrum pipelines; they only
 import :func:`make_observed_patch` / :func:`required_source_crop` so the *image*
@@ -43,29 +43,17 @@ from PIL import Image
 CANONICAL_CLASSES = [
     "original",
     "JPEG_Q80",
-    "upsample_x2",
-    "upsample_x4",
     "downsample_x8",
     "downsample_x16",
-]
-
-# 7-class sweep: u6 set + upsample_x8 (stronger upsampling; crop = o/8).
-# Mask/CNN configs: configs/size_sweep/u7_* ; outputs: u7_mask_size*, u7_poscnn_size*.
-CANONICAL_CLASSES_U7 = [
-    "original",
-    "JPEG_Q80",
-    "downsample_x8",
-    "downsample_x16",
-    "upsample_x2",
     "upsample_x4",
     "upsample_x8",
 ]
 
-OBSERVED_SIZES = [32, 48, 64, 96, 128]
+OBSERVED_SIZES = [32, 64, 96, 128]
 
 DEFAULT_JPEG_QUALITY = 80
 
-_UPSAMPLE_FACTORS = {"upsample_x2": 2, "upsample_x4": 4, "upsample_x8": 8}
+_UPSAMPLE_FACTORS = {"upsample_x4": 4, "upsample_x8": 8}
 _DOWNSAMPLE_FACTORS = {"downsample_x8": 8, "downsample_x16": 16}
 
 _BICUBIC = Image.Resampling.BICUBIC

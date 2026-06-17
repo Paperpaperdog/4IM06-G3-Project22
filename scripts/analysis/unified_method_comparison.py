@@ -65,48 +65,33 @@ def binary_accuracy_from_confusion(confusion: list[list[float]], class_names: li
     return correct / total if total > 0 else float("nan")
 
 
-LEARNABLE_TEMPLATE = {
+LEARNABLE = {
     "mask": {
-        "metrics": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / "{variant}_mask_size{size}" / "metrics.json",
-        "config": PROJECT_ROOT / "spectral-mask-resampling" / "configs" / "size_sweep" / "{variant}_mask_size{size}.yaml",
+        "metrics": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / "n6_mask_size{size}" / "metrics.json",
+        "config": PROJECT_ROOT / "spectral-mask-resampling" / "configs" / "size_sweep" / "n6_mask_size{size}.yaml",
     },
     "cnn": {
-        "metrics": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / "{variant}_poscnn_size{size}" / "metrics.json",
-        "config": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "configs" / "size_sweep" / "{variant}_poscnn_size{size}.yaml",
+        "metrics": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / "n6_poscnn_size{size}" / "metrics.json",
+        "config": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "configs" / "size_sweep" / "n6_poscnn_size{size}.yaml",
     },
 }
-
-
-def learnable_paths(variant: str) -> dict:
-    return {
-        method: {k: Path(str(v).format(variant=variant, size="{size}")) for k, v in paths.items()}
-        for method, paths in LEARNABLE_TEMPLATE.items()
-    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sizes", default="32,64,96,128")
-    parser.add_argument("--variant", default="u6", choices=["u6", "u7", "n6"],
-                        help="u6=6-class main sweep; u7=adds upsample_x8 (7 classes); "
-                             "n6=native-spectrum 6-class set (ds8/ds16/up4/up8).")
     parser.add_argument(
         "--classical-eval-dir",
         type=Path,
-        default=None,
+        default=PROJECT_ROOT / "test_results" / "jpeg_detector_size_sweep_n6",
         help="Dir with eval_size{size}.json from jpeg_detector_size_sweep.py "
              "(run it with --max-sizes equal to --sizes here).",
     )
-    parser.add_argument("--outdir", type=Path, default=None)
+    parser.add_argument("--outdir", type=Path, default=PROJECT_ROOT / "test_results" / "unified_comparison")
     args = parser.parse_args()
 
-    _suffix = {"u7": "_u7", "n6": "_n6"}.get(args.variant, "")
-    if args.classical_eval_dir is None:
-        args.classical_eval_dir = PROJECT_ROOT / "test_results" / f"jpeg_detector_size_sweep{_suffix}"
-    args.outdir = args.outdir or (PROJECT_ROOT / "test_results" / f"unified_comparison{_suffix}")
-
-    learnable = learnable_paths(args.variant)
-    n_class_label = "seven_class_accuracy" if args.variant == "u7" else "six_class_accuracy"
+    learnable = LEARNABLE
+    n_class_label = "six_class_accuracy"
 
     sizes = [int(s) for s in args.sizes.split(",") if s.strip()]
     args.outdir.mkdir(parents=True, exist_ok=True)
@@ -170,7 +155,7 @@ def main() -> None:
         plt.plot(xs, ys, marker="o", label=method)
     plt.xlabel("Input size (px)")
     plt.ylabel("Binary 'resampling detected' accuracy")
-    plt.title(f"Three methods on the common binary axis ({args.variant}, resampled vs original)")
+    plt.title("Three methods on the common binary axis (n6, resampled vs original)")
     plt.ylim(0, 1)
     plt.grid(True, linestyle=":", alpha=0.6)
     plt.legend()

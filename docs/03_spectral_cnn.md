@@ -306,38 +306,36 @@ bash scripts/run_v1_train.sh  # 需指定对应 config
 
 ---
 
-## 10. 新增：上采样类别 + 统一类别 + 输入尺寸扫描
+## 10. 当前主协议 `n6`：6 类 + 原生谱 + 每尺寸单独训练
 
-为解决三个遗留问题（缺上采样、三方法输入尺寸不一致、未探究尺寸影响），CNN
-路线与 Mask 路线对齐到**同一套 6 类**，并支持任意观测尺寸。
+为让三条路线在**完全一致的设定**下对比，当前主实验采用 `n6` 协议：CNN 与 Mask
+共享同一套 6 类、各观测尺寸**单独训练**、都用**原生** rFFT 谱 \(o\times(o/2{+}1)\)。
+CNN 一向用原生谱，因此本路线改动很小，主要是统一类别集合并支持任意观测尺寸。
 
 ### 10.1 统一 6 类（含上采样）
 
 | 类 | 名称 | 裁切源尺寸 → 最终 \(o\) |
 |----|------|------------------------|
 | 0 | `original` | 裁 \(o\) |
-| 1 | `JPEG` | 裁 \(o\) → JPEG Q80 |
+| 1 | `JPEG_Q80` | 裁 \(o\) → JPEG Q80 |
 | 2 | `downsample_x8` | 裁 \(8o\) → resize \(o\) |
 | 3 | `downsample_x16` | 裁 \(16o\) → resize \(o\) |
-| 4 | `upsample_x2` | 裁 \(o/2\) → resize \(o\) |
-| 5 | `upsample_x4` | 裁 \(o/4\) → resize \(o\) |
+| 4 | `upsample_x4` | 裁 \(o/4\) → resize \(o\) |
+| 5 | `upsample_x8` | 裁 \(o/8\) → resize \(o\) |
 
-关键修复：`src/data/preprocess_spectra.py` 原先写死 `CLASS_CROP_SIZES`（基于
-`final_size=64`），现改为 `class_crop_size(name, final_size)`，裁切随配置尺寸缩放；
-`src/processing/spectrum.py` 去掉了仅允许 64×64 的断言。CNN 用 GAP，天然支持变尺寸；
-位置编码通道数与尺寸无关（恒 44）。
+> `upsample_x8` 在 \(o=32\) 时源裁切 = 4px（最小裁切下限）；`downsample_x16` 在
+> \(o=128\) 时需裁 2048px，RAISE TIFF 足够大，预处理会自动重试其他源图。
 
-### 10.2 输入尺寸扫描配置
+关键支持：`src/data/preprocess_spectra.py` 用 `class_crop_size(name, final_size)`
+随配置尺寸缩放裁切；`src/processing/spectrum.py` 不再限制 64×64。CNN 用 GAP，天然
+支持变尺寸；位置编码通道数与尺寸无关（恒 44）。
 
-`configs/size_sweep/u6_poscnn_size{32,64,96,128}.yaml`——每个尺寸一个配置，
-`final_size` 与 `spectrum.height/width/width_rfft` 随之变化，`num_classes: 6`。
+### 10.2 配置与运行
 
-> 注：`downsample_x16` 在 \(o=128\) 时需裁 2048px；RAISE TIFF 足够大，预处理会自动重试其他源图。
-
-### 10.3 NPU 运行与提交
-
-管线脚本现在**从配置自动推导输出目录**（不再写死 `outputs/v1_final64_poscnn`），
-所以集群 `vc_cnn_spectral_v1.sh` 只要设 `CONFIG` 即可跑任意 sweep 配置。
+配置：`configs/size_sweep/n6_poscnn_size{32,64,96,128}.yaml`——每个尺寸一个配置，
+`final_size` 与 `spectrum.height/width/width_rfft` 随之变化，`num_classes: 6`，
+独立缓存 `data/processed/n6_tv_rfft_size*`、输出 `outputs/n6_poscnn_size*`。管线脚本
+**从配置自动推导输出目录**，所以集群 `vc_cnn_spectral_v1.sh` 只要设 `CONFIG` 即可。
 
 ```bash
 cd CNN/spectral-history-cnn
@@ -345,58 +343,18 @@ cd CNN/spectral-history-cnn
 # 交互节点：顺序跑全部尺寸
 bash scripts/run_size_sweep.sh
 
-# 集群 NPU：每个尺寸一个 vc 作业（沿用 xby-branch 的 vc 流程）
-bash scripts/submit_size_sweep_npu.sh
+# 集群 NPU：每个尺寸一个 vc 作业
+SIZES="32 64 96 128" bash scripts/submit_size_sweep_npu.sh
 
 # 本地冒烟
 LIMIT_SAMPLES=50 EPOCHS=2 DEVICE=cpu bash scripts/run_size_sweep.sh
 ```
 
-### 10.4 跨方法尺寸效应汇总
+### 10.3 跨方法尺寸效应汇总
 
 ```bash
 cd ../..
-python scripts/analysis/summarize_size_effect.py
+python scripts/analysis/summarize_size_effect.py      # Mask vs CNN：准确率 vs 输入尺寸
+python scripts/analysis/unified_method_comparison.py  # 三方法在二分轴上的对比
 ```
-输出 `test_results/size_effect/`（CSV + 准确率-尺寸曲线，Mask 与 CNN 同图对比）。
-
----
-
-## 11. 最终协议 `n6`：与 Mask 原生谱对齐（当前主实验）
-
-`n6` 是当前主线协议，CNN 与 Mask 在**完全一致的设定**下对比：每尺寸单独训练、
-**原生** rFFT 谱、同一套 6 类。CNN 一向用原生谱 \(o\times(o/2{+}1)\)，因此本路线
-改动很小，主要是换类别集合。
-
-### 11.1 类别集合（相对 `u6` 的变化）
-
-| `u6`（§10） | **`n6`（当前）** |
-|-------------|------------------|
-| original / JPEG_Q80 / ds×8 / ds×16 / **up×2 / up×4** | original / JPEG_Q80 / ds×8 / ds×16 / **up×4 / up×8** |
-
-去掉 `upsample_x2`、加入更强的 `upsample_x8`（源裁切 \(o/8\)，\(o=32\) 时为 4px）。
-`src/data/preprocess_spectra.py` 的 `class_crop_size` / `parse_class_spec` 已通用支持
-`upsample_x8`，无需额外改动。
-
-### 11.2 配置与运行
-
-配置：`configs/size_sweep/n6_poscnn_size{32,64,96,128}.yaml`（`num_classes: 6`，
-独立缓存 `data/processed/n6_tv_rfft_size*`、输出 `outputs/n6_poscnn_size*`）。
-
-```bash
-cd CNN/spectral-history-cnn
-
-# 交互节点顺序跑全部尺寸
-SWEEP_TAG=n6 bash scripts/run_size_sweep.sh
-
-# 集群 NPU：每个尺寸一个 vc 作业
-SWEEP_TAG=n6 SKIP_PREPARE=0 SIZES="32 64 96 128" bash scripts/submit_size_sweep_npu.sh
-```
-
-### 11.3 汇总
-
-```bash
-cd ../..
-python scripts/analysis/summarize_size_effect.py --variant n6
-python scripts/analysis/unified_method_comparison.py --variant n6
-```
+输出 `test_results/size_effect/` 与 `test_results/unified_comparison/`。
