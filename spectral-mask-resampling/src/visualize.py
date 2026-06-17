@@ -6,6 +6,7 @@ import torch
 
 from src.data.dataset import SpectraDataset
 from src.evaluate import load_model
+from src.utils.device import resolve_device, setup_device_env
 from src.utils.io import ensure_dir, load_config
 from src.utils.plots import save_image, save_training_curves
 
@@ -62,7 +63,8 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    device = torch.device(config["training"]["device"])
+    setup_device_env(config)
+    device = resolve_device(config["training"]["device"])
     output_dir = Path(config["output_dir"])
     model = load_model(config, args.checkpoint, device)
     save_model_visuals(model, config["class_names"], output_dir)

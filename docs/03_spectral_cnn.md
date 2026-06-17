@@ -303,3 +303,59 @@ bash scripts/run_v1_train.sh  # 需指定对应 config
 | 4 类配置 | `configs/v1_final64_poscnn_local.yaml` |
 | 测试指标 | `outputs/v1_final64_poscnn/metrics_test.json` |
 | 子项目 README | [`../CNN/spectral-history-cnn/README.md`](../CNN/spectral-history-cnn/README.md) |
+
+---
+
+## 10. 新增：上采样类别 + 统一类别 + 输入尺寸扫描
+
+为解决三个遗留问题（缺上采样、三方法输入尺寸不一致、未探究尺寸影响），CNN
+路线与 Mask 路线对齐到**同一套 6 类**，并支持任意观测尺寸。
+
+### 10.1 统一 6 类（含上采样）
+
+| 类 | 名称 | 裁切源尺寸 → 最终 \(o\) |
+|----|------|------------------------|
+| 0 | `original` | 裁 \(o\) |
+| 1 | `JPEG` | 裁 \(o\) → JPEG Q80 |
+| 2 | `downsample_x8` | 裁 \(8o\) → resize \(o\) |
+| 3 | `downsample_x16` | 裁 \(16o\) → resize \(o\) |
+| 4 | `upsample_x2` | 裁 \(o/2\) → resize \(o\) |
+| 5 | `upsample_x4` | 裁 \(o/4\) → resize \(o\) |
+
+关键修复：`src/data/preprocess_spectra.py` 原先写死 `CLASS_CROP_SIZES`（基于
+`final_size=64`），现改为 `class_crop_size(name, final_size)`，裁切随配置尺寸缩放；
+`src/processing/spectrum.py` 去掉了仅允许 64×64 的断言。CNN 用 GAP，天然支持变尺寸；
+位置编码通道数与尺寸无关（恒 44）。
+
+### 10.2 输入尺寸扫描配置
+
+`configs/size_sweep/u6_poscnn_size{32,64,96,128}.yaml`——每个尺寸一个配置，
+`final_size` 与 `spectrum.height/width/width_rfft` 随之变化，`num_classes: 6`。
+
+> 注：`downsample_x16` 在 \(o=128\) 时需裁 2048px；RAISE TIFF 足够大，预处理会自动重试其他源图。
+
+### 10.3 NPU 运行与提交
+
+管线脚本现在**从配置自动推导输出目录**（不再写死 `outputs/v1_final64_poscnn`），
+所以集群 `vc_cnn_spectral_v1.sh` 只要设 `CONFIG` 即可跑任意 sweep 配置。
+
+```bash
+cd CNN/spectral-history-cnn
+
+# 交互节点：顺序跑全部尺寸
+bash scripts/run_size_sweep.sh
+
+# 集群 NPU：每个尺寸一个 vc 作业（沿用 xby-branch 的 vc 流程）
+bash scripts/submit_size_sweep_npu.sh
+
+# 本地冒烟
+LIMIT_SAMPLES=50 EPOCHS=2 DEVICE=cpu bash scripts/run_size_sweep.sh
+```
+
+### 10.4 跨方法尺寸效应汇总
+
+```bash
+cd ../..
+python scripts/analysis/summarize_size_effect.py
+```
+输出 `test_results/size_effect/`（CSV + 准确率-尺寸曲线，Mask 与 CNN 同图对比）。

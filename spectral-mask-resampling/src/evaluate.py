@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from src.data.dataset import SpectraDataset
 from src.models.spectral_mask_classifier import SpectralMaskClassifier
+from src.utils.device import resolve_device, setup_device_env
 from src.utils.io import ensure_dir, load_config, save_json
 from src.utils.metrics import compute_metrics
 from src.utils.plots import save_confusion_matrix
@@ -38,7 +39,8 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    device = torch.device(config["training"]["device"])
+    setup_device_env(config)
+    device = resolve_device(config["training"]["device"])
     output_dir = Path(config["output_dir"])
     figures_dir = ensure_dir(output_dir / "figures")
     dataset = SpectraDataset(config["data_dir"], args.split)

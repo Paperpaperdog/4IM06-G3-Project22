@@ -121,12 +121,40 @@ def blockwise_x8_resample(
     return out
 
 
+def global_upsample(img: Image.Image, factor: int, interpolation: str = "bicubic") -> Image.Image:
+    """Simulate a globally up-sampled image at the same final size.
+
+    The image is first downscaled by `factor` (the latent smaller original) and
+    then upscaled back by `factor`, so the dominant fresh trace is the
+    upsampling interpolation grid (period `factor`). This matches the global
+    up-sampling convention used by the Mask / CNN routes, as opposed to the
+    block-wise period-8 `resample_x8` class.
+    """
+    interp_map = {
+        "nearest": Image.NEAREST,
+        "bilinear": Image.BILINEAR,
+        "bicubic": Image.BICUBIC,
+        "lanczos": Image.LANCZOS,
+    }
+    if interpolation not in interp_map:
+        raise ValueError(f"Unknown interpolation: {interpolation}")
+    interp = interp_map[interpolation]
+
+    img = crop_to_multiple_of_8(img.convert("RGB"))
+    w, h = img.size
+    small_w = max(1, w // factor)
+    small_h = max(1, h // factor)
+    small = img.resize((small_w, small_h), interp)
+    return small.resize((w, h), interp)
+
+
 def make_versions(
     img: Image.Image,
     quality: int,
     interpolation: str,
     inner_delta: int,
-    mix_order: str
+    mix_order: str,
+    upsample_factors: list | None = None,
 ) -> dict:
     """
     Generate requested post-processing versions.
@@ -170,6 +198,11 @@ def make_versions(
         versions["mix_resample_x8_then_jpeg"] = jpeg_compress_decode(
             resample_first,
             quality=quality
+        )
+
+    for factor in (upsample_factors or []):
+        versions[f"upsample_x{int(factor)}"] = global_upsample(
+            img, factor=int(factor), interpolation=interpolation
         )
 
     return versions
@@ -231,7 +264,26 @@ def main():
         help="Also copy/crop original images into output_dir/original."
     )
 
+    parser.add_argument(
+        "--include_upsampling",
+        action="store_true",
+        help="Also generate global up-sampling classes (upsample_xN)."
+    )
+
+    parser.add_argument(
+        "--upsample_factors",
+        type=str,
+        default="2,4",
+        help="Comma-separated global up-sampling factors, used with --include_upsampling."
+    )
+
     args = parser.parse_args()
+
+    upsample_factors = (
+        [int(f) for f in args.upsample_factors.split(",") if f.strip()]
+        if args.include_upsampling
+        else []
+    )
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
@@ -253,6 +305,8 @@ def main():
     (output_dir / "jpeg").mkdir(parents=True, exist_ok=True)
     (output_dir / "resample_x8").mkdir(parents=True, exist_ok=True)
     (output_dir / "mix").mkdir(parents=True, exist_ok=True)
+    for factor in upsample_factors:
+        (output_dir / f"upsample_x{factor}").mkdir(parents=True, exist_ok=True)
 
     processed = 0
     skipped = 0
@@ -267,7 +321,8 @@ def main():
                 quality=args.quality,
                 interpolation=args.interpolation,
                 inner_delta=args.inner_delta,
-                mix_order=args.mix_order
+                mix_order=args.mix_order,
+                upsample_factors=upsample_factors,
             )
 
             stem = path.stem
@@ -302,6 +357,13 @@ def main():
                 save_png(
                     versions["mix_resample_x8_then_jpeg"],
                     output_dir / "mix" / mix_name
+                )
+
+            for factor in upsample_factors:
+                up_name = f"{stem}_upsample_x{factor}_{args.interpolation}.png"
+                save_png(
+                    versions[f"upsample_x{factor}"],
+                    output_dir / f"upsample_x{factor}" / up_name
                 )
 
             processed += 1

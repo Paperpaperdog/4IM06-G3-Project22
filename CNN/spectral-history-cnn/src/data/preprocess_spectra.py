@@ -22,16 +22,55 @@ from src.utils.io import ensure_dir, load_json, load_yaml, save_json, update_nes
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-CLASS_CROP_SIZES = {
-    "original": 64,
-    "JPEG": 64,
-    "downsample_x2": 128,
-    "downsample_x4": 256,
-    "downsample_x8": 512,
-    "downsample_x16": 1024,
-}
+# Minimum crop size (pixels) allowed for an upsampling class, so that an
+# upsample factor on a small final_size does not crop a degenerate patch.
+MIN_UPSAMPLE_CROP = 4
 
 SPLIT_SEED_OFFSETS = {"train": 0, "val": 100_000, "test": 200_000}
+
+
+def parse_class_spec(class_name: str) -> tuple[str, int]:
+    """Map a class name to ``(kind, factor)``.
+
+    Supported kinds: ``original`` / ``jpeg`` (factor 1), ``downsample`` and
+    ``upsample`` (factor parsed from the ``_xN`` suffix). This replaces the old
+    hard-coded crop table so that input size and up/down direction are derived
+    from the class name and the configured ``final_size``.
+    """
+    if class_name == "original":
+        return "original", 1
+    if class_name in ("JPEG", "JPEG_Q80"):
+        return "jpeg", 1
+    if class_name.startswith("downsample_x"):
+        return "downsample", int(class_name.rsplit("_x", 1)[-1])
+    if class_name.startswith("upsample_x"):
+        return "upsample", int(class_name.rsplit("_x", 1)[-1])
+    raise ValueError(
+        f"Unknown class '{class_name}'. Expected 'original', 'JPEG', "
+        "'downsample_xN' or 'upsample_xN'."
+    )
+
+
+def class_crop_size(class_name: str, final_size: int) -> int:
+    """Source crop size for a class given the final observed size.
+
+    - original / JPEG: crop exactly ``final_size``.
+    - downsample_xN: crop ``N * final_size`` then resize down to ``final_size``.
+    - upsample_xN: crop ``final_size // N`` then resize up to ``final_size``.
+    """
+    kind, factor = parse_class_spec(class_name)
+    if kind in ("original", "jpeg"):
+        return int(final_size)
+    if kind == "downsample":
+        return int(final_size) * int(factor)
+    crop = int(final_size) // int(factor)
+    if crop < MIN_UPSAMPLE_CROP:
+        raise ValueError(
+            f"Upsample class '{class_name}' with final_size={final_size} yields a "
+            f"degenerate crop of {crop}px (< {MIN_UPSAMPLE_CROP}). "
+            "Use a smaller factor or larger final_size."
+        )
+    return crop
 
 
 def resolve_image_path(raise_dir: Path, rel_path: str) -> Path:
@@ -102,7 +141,8 @@ def make_final_image(
     interpolation: str,
     rng: np.random.Generator,
 ) -> tuple[Image.Image, Dict[str, Any]] | None:
-    crop_size = CLASS_CROP_SIZES[class_name]
+    crop_size = class_crop_size(class_name, final_size)
+    kind, _factor = parse_class_spec(class_name)
     try:
         with Image.open(source_path) as img:
             img = img.convert("RGB")
@@ -117,10 +157,10 @@ def make_final_image(
     jpeg_value = ""
     interpolation_value = ""
 
-    if class_name == "JPEG":
+    if kind == "jpeg":
         final_img = apply_jpeg_pil(crop, jpeg_quality)
         jpeg_value = int(jpeg_quality)
-    elif class_name.startswith("downsample"):
+    elif kind in ("downsample", "upsample"):
         final_img = resize_to_final(crop, final_size, interpolation)
         interpolation_value = interpolation
     else:
@@ -205,11 +245,9 @@ def build_class_samples(
     limit_samples: int | None,
     show_progress: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, list[Dict[str, Any]]]:
-    if class_name not in CLASS_CROP_SIZES:
-        raise ValueError(f"Unknown class '{class_name}'.")
-
     data_cfg = config["data"]
     final_size = int(data_cfg["final_size"])
+    parse_class_spec(class_name)  # validate, raises on unknown class
     width_rfft = final_size // 2 + 1
     target_key = f"{split}_samples_per_class"
     target_per_class = int(data_cfg[target_key])
@@ -236,7 +274,7 @@ def build_class_samples(
         if attempts >= max_attempts:
             raise RuntimeError(
                 f"Could only generate {made}/{target_per_class} samples for {split}:{class_name}. "
-                f"Many images may be smaller than crop size {CLASS_CROP_SIZES[class_name]}."
+                f"Many images may be smaller than crop size {class_crop_size(class_name, final_size)}."
             )
         attempts += 1
         source_entry = sources[int(rng.integers(0, len(sources)))]

@@ -18,8 +18,8 @@ def compute_log_rfft_spectrum(residual: np.ndarray, dc_sigma_bins: float = 3.0) 
     if residual.ndim != 2:
         raise ValueError(f"Expected residual shape [H,W], got {residual.shape}.")
     height, width = residual.shape
-    if height != 64 or width != 64:
-        raise ValueError(f"Version 1 expects a 64x64 residual, got {height}x{width}.")
+    if height != width:
+        raise ValueError(f"Expected a square residual, got {height}x{width}.")
 
     x = torch.from_numpy(residual.astype(np.float32)).unsqueeze(0)
     f = torch.fft.rfft2(x, dim=(-2, -1), norm="ortho")

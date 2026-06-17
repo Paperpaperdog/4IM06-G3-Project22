@@ -1,0 +1,41 @@
+# Unified 6-class spectral mask trained on a single observed size (96).
+experiment_name: u6_mask_size96
+data_dir: data/processed/u6_mask_size96
+output_dir: outputs/u6_mask_size96
+
+num_classes: 6
+class_names:
+  - original
+  - JPEG_Q80
+  - downsample_x8
+  - downsample_x16
+  - upsample_x2
+  - upsample_x4
+
+observed_sizes:
+  - 96
+
+spectrum:
+  channels: 1
+  height: 512
+  width_rfft: 257
+
+model:
+  type: spectral_mask_classifier
+  init_mask_logits: 0.0
+  init_reference_std: 0.02
+  lambda_mask_l1: 0.0
+
+training:
+  device: npu
+  npu_visible_devices: "0"
+  batch_size: 64
+  epochs: 30
+  optimizer: AdamW
+  lr: 0.001
+  weight_decay: 0.0001
+  scheduler: cosine
+  seed: 123
+  num_workers: 4
+  pin_memory: true
+  save_best_by: val_loss

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -195,113 +196,147 @@ def parse_str_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+SUMMARY_HEADER = [
+    "image_id",
+    "source_size",
+    "target_size",
+    "method",
+    "axis",
+    "best_distance",
+    "best_nfa",
+    "true_rank",
+    "top_candidate",
+    "top_score",
+    "result_dir",
+]
+
+
+def process_image(tiff_path: Path, args: argparse.Namespace) -> list[list]:
+    """Run every (source_size, method, axis) case for one image.
+
+    Each image writes only to its own per-id subdirectories, so images can be
+    processed independently in parallel. Returns the summary rows for this image.
+    """
+    source_sizes = parse_int_list(args.source_sizes)
+    methods = parse_str_list(args.methods)
+
+    rows: list[list] = []
+    reference = load_reference_png(tiff_path, args.outdir / "references")
+    for source_size in source_sizes:
+        source = resize_square(reference, source_size, "lanczos")
+        source_dir = args.outdir / "controlled_sources" / image_id(tiff_path)
+        source_dir.mkdir(parents=True, exist_ok=True)
+        source_png = source_dir / f"source_{source_size}.png"
+        source.save(source_png)
+
+        for method in methods:
+            target = resize_square(source, args.target_size, method)
+            target_array = np.asarray(target.convert("L"))
+
+            case_dir = (
+                args.outdir
+                / "cases"
+                / image_id(tiff_path)
+                / f"source_{source_size}_target_{args.target_size}_{method}"
+            )
+            case_dir.mkdir(parents=True, exist_ok=True)
+            target.save(case_dir / "target.png")
+
+            vertical, horizontal = detect_both_axes(
+                target_array,
+                tv_weight=args.tv_weight,
+                radius=args.radius,
+            )
+
+            save_axis_csv(vertical, case_dir / "vertical_nfa.csv")
+            save_axis_csv(horizontal, case_dir / "horizontal_nfa.csv")
+            save_peak_csv(
+                vertical,
+                case_dir / "vertical_peaks.csv",
+                args.nfa_threshold,
+                args.top_peak_k,
+            )
+            save_peak_csv(
+                horizontal,
+                case_dir / "horizontal_peaks.csv",
+                args.nfa_threshold,
+                args.top_peak_k,
+            )
+            save_nfa_plot(vertical, horizontal, case_dir / "nfa_curves.png", args.nfa_threshold)
+            save_spectrum_plot(target_array, case_dir / "spectrum.png", args.tv_weight)
+
+            for axis_name, result in (("vertical", vertical), ("horizontal", horizontal)):
+                candidates = rank_size_candidates(
+                    result,
+                    args.target_size,
+                    nfa_threshold=args.nfa_threshold,
+                    top_peak_k=args.top_peak_k,
+                    min_scale=args.min_scale,
+                    max_scale=args.max_scale,
+                    tolerance=args.tolerance,
+                )
+                rank = save_candidates_csv(
+                    candidates,
+                    source_size,
+                    case_dir / f"{axis_name}_candidates.csv",
+                )
+                top = candidates[0] if candidates else None
+                rows.append(
+                    [
+                        image_id(tiff_path),
+                        source_size,
+                        args.target_size,
+                        method,
+                        axis_name,
+                        result.best_distance,
+                        f"{result.best_nfa:.6g}",
+                        "" if rank is None else rank,
+                        "" if top is None else top.size,
+                        "" if top is None else f"{top.score:.6g}",
+                        case_dir,
+                    ]
+                )
+    return rows
+
+
+def _process_image_star(packed):
+    tiff_path, args = packed
+    return process_image(tiff_path, args)
+
+
 def run_experiment(args: argparse.Namespace) -> Path:
     tiff_paths = discover_tiff_paths(args.image_dir, args.raise_csv, args.limit_images)
     if not tiff_paths:
         raise RuntimeError(f"no TIFF images found in {args.image_dir}")
 
-    source_sizes = parse_int_list(args.source_sizes)
     methods = parse_str_list(args.methods)
     unknown_methods = sorted(set(methods) - set(RESAMPLE_FILTERS))
     if unknown_methods:
         raise ValueError(f"unknown interpolation methods: {', '.join(unknown_methods)}")
 
     args.outdir.mkdir(parents=True, exist_ok=True)
+
+    workers = (os.cpu_count() or 1) if args.workers == 0 else max(1, args.workers)
+    workers = min(workers, len(tiff_paths))
+
+    # pool.map preserves task order, so the summary stays identical to the
+    # original sequential run regardless of how many workers are used.
+    if workers == 1:
+        per_image_rows = [process_image(path, args) for path in tiff_paths]
+    else:
+        print(f"[Info] Processing {len(tiff_paths)} images across {workers} workers ...")
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            per_image_rows = list(
+                pool.map(_process_image_star, [(path, args) for path in tiff_paths])
+            )
+
     summary_path = args.outdir / "summary.csv"
     with summary_path.open("w", newline="") as summary_handle:
         summary = csv.writer(summary_handle)
-        summary.writerow(
-            [
-                "image_id",
-                "source_size",
-                "target_size",
-                "method",
-                "axis",
-                "best_distance",
-                "best_nfa",
-                "true_rank",
-                "top_candidate",
-                "top_score",
-                "result_dir",
-            ]
-        )
-
-        for tiff_path in tiff_paths:
-            reference = load_reference_png(tiff_path, args.outdir / "references")
-            for source_size in source_sizes:
-                source = resize_square(reference, source_size, "lanczos")
-                source_dir = args.outdir / "controlled_sources" / image_id(tiff_path)
-                source_dir.mkdir(parents=True, exist_ok=True)
-                source_png = source_dir / f"source_{source_size}.png"
-                source.save(source_png)
-
-                for method in methods:
-                    target = resize_square(source, args.target_size, method)
-                    target_array = np.asarray(target.convert("L"))
-
-                    case_dir = (
-                        args.outdir
-                        / "cases"
-                        / image_id(tiff_path)
-                        / f"source_{source_size}_target_{args.target_size}_{method}"
-                    )
-                    case_dir.mkdir(parents=True, exist_ok=True)
-                    target.save(case_dir / "target.png")
-
-                    vertical, horizontal = detect_both_axes(
-                        target_array,
-                        tv_weight=args.tv_weight,
-                        radius=args.radius,
-                    )
-
-                    save_axis_csv(vertical, case_dir / "vertical_nfa.csv")
-                    save_axis_csv(horizontal, case_dir / "horizontal_nfa.csv")
-                    save_peak_csv(
-                        vertical,
-                        case_dir / "vertical_peaks.csv",
-                        args.nfa_threshold,
-                        args.top_peak_k,
-                    )
-                    save_peak_csv(
-                        horizontal,
-                        case_dir / "horizontal_peaks.csv",
-                        args.nfa_threshold,
-                        args.top_peak_k,
-                    )
-                    save_nfa_plot(vertical, horizontal, case_dir / "nfa_curves.png", args.nfa_threshold)
-                    save_spectrum_plot(target_array, case_dir / "spectrum.png", args.tv_weight)
-
-                    for axis_name, result in (("vertical", vertical), ("horizontal", horizontal)):
-                        candidates = rank_size_candidates(
-                            result,
-                            args.target_size,
-                            nfa_threshold=args.nfa_threshold,
-                            top_peak_k=args.top_peak_k,
-                            min_scale=args.min_scale,
-                            max_scale=args.max_scale,
-                            tolerance=args.tolerance,
-                        )
-                        rank = save_candidates_csv(
-                            candidates,
-                            source_size,
-                            case_dir / f"{axis_name}_candidates.csv",
-                        )
-                        top = candidates[0] if candidates else None
-                        summary.writerow(
-                            [
-                                image_id(tiff_path),
-                                source_size,
-                                args.target_size,
-                                method,
-                                axis_name,
-                                result.best_distance,
-                                f"{result.best_nfa:.6g}",
-                                "" if rank is None else rank,
-                                "" if top is None else top.size,
-                                "" if top is None else f"{top.score:.6g}",
-                                case_dir,
-                            ]
-                        )
+        summary.writerow(SUMMARY_HEADER)
+        for rows in per_image_rows:
+            for row in rows:
+                summary.writerow(row)
 
     return summary_path
 
@@ -322,6 +357,12 @@ def main() -> None:
     parser.add_argument("--min-scale", type=float, default=0.25)
     parser.add_argument("--max-scale", type=float, default=4.0)
     parser.add_argument("--tolerance", type=int, default=1)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="Parallel worker processes across images. 0 = all CPU cores, 1 = single process.",
+    )
     args = parser.parse_args()
 
     summary_path = run_experiment(args)

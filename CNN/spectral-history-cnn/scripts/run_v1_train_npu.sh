@@ -31,6 +31,11 @@ from src.utils.device import print_device_info
 print_device_info()
 PY
 
+# Derive output dir (and checkpoint) from the config for sweep compatibility.
+OUTPUT_DIR="$("$PY" -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['paths']['output_dir'])")"
+CKPT="$OUTPUT_DIR/checkpoints/best.pt"
+log "OUTPUT_DIR=$OUTPUT_DIR"
+
 status "train"
 "$PY" src/train.py \
   --config "$CONFIG" \
@@ -44,13 +49,13 @@ status "eval"
 if "$PY" src/evaluate.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
-  --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+  --checkpoint "$CKPT" \
   --split test 2>&1 | tee -a "$LOG_FILE"; then
   status "visualize"
   "$PY" src/visualize.py \
     --config "$CONFIG" \
     --device "$DEVICE" \
-    --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+    --checkpoint "$CKPT" \
     --split test 2>&1 | tee -a "$LOG_FILE"
 else
   log "WARN: eval/visualize skipped (optional deps missing on NPU image)"

@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset import SpectraDataset
 from src.models.spectral_mask_classifier import SpectralMaskClassifier
+from src.utils.device import resolve_device, setup_device_env
 from src.utils.io import ensure_dir, load_config
 from src.utils.seed import set_seed
 
@@ -90,7 +91,9 @@ def main() -> None:
     ensure_dir(output_dir / "logs")
     shutil.copyfile(args.config, output_dir / "config.yaml")
 
-    device = torch.device(config["training"]["device"])
+    setup_device_env(config)
+    device = resolve_device(config["training"]["device"])
+    print(f"Using device: {device}")
     train_loader = make_loader(config, "train", shuffle=True)
     val_loader = make_loader(config, "val", shuffle=False)
     model = make_model(config).to(device)

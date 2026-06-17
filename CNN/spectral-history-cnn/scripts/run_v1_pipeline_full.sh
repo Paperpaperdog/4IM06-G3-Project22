@@ -56,6 +56,12 @@ from src.utils.device import print_device_info
 print_device_info()
 PY
 
+# Derive the output dir (and thus checkpoint path) from the config so the same
+# pipeline works for any config in the input-size sweep.
+OUTPUT_DIR="$(python -c "import yaml,sys;print(yaml.safe_load(open('$CONFIG'))['paths']['output_dir'])")"
+CKPT="$OUTPUT_DIR/checkpoints/best.pt"
+log "OUTPUT_DIR=$OUTPUT_DIR"
+
 status "train"
 python src/train.py \
   --config "$CONFIG" \
@@ -69,16 +75,16 @@ status "eval"
 python src/evaluate.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
-  --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+  --checkpoint "$CKPT" \
   --split test 2>&1 | tee -a "$LOG_FILE"
 
 status "visualize"
 python src/visualize.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
-  --checkpoint outputs/v1_final64_poscnn/checkpoints/best.pt \
+  --checkpoint "$CKPT" \
   --split test 2>&1 | tee -a "$LOG_FILE"
 
 status "DONE"
-log "outputs in outputs/v1_final64_poscnn"
+log "outputs in $OUTPUT_DIR"
 log "=== CNN v1 pipeline finished ==="

@@ -293,3 +293,71 @@ python scripts/plot_mask_results.py
 | 指标 | `outputs/.../metrics.json` |
 | 图表 | `outputs/.../figures/summary/` |
 | 子项目 README | [`../spectral-mask-resampling/README.md`](../spectral-mask-resampling/README.md) |
+
+---
+
+## 9. 新增：上采样类别 + 统一类别 + 输入尺寸扫描
+
+为解决三个遗留问题（缺上采样、三方法输入尺寸不一致、未探究尺寸影响），Mask
+路线做了如下扩展（与 CNN 路线对齐）。
+
+### 9.1 统一 6 类（含上采样）
+
+类别名现在解析为 `(kind, factor)`，上采样裁 `o/factor` 再放大到观测尺寸 `o`：
+
+| index | 名称 | 生成方式（观测尺寸 \(o\)） |
+|-------|------|---------------------------|
+| 0 | `original` | 裁 \(o\) |
+| 1 | `JPEG_Q80` | 裁 \(o\) → JPEG Q80 |
+| 2 | `downsample_x8` | 裁 \(8o\) → resize \(o\) |
+| 3 | `downsample_x16` | 裁 \(16o\) → resize \(o\) |
+| 4 | `upsample_x2` | 裁 \(o/2\) → resize \(o\) |
+| 5 | `upsample_x4` | 裁 \(o/4\) → resize \(o\) |
+
+`src/data/preprocess_spectra.py` 中 `parse_class_spec` / `source_patch_size`
+统一处理裁切尺寸；原先「只许 v1 四类」的强校验已放开，类别/观测尺寸/倍率均可配置。
+
+### 9.2 输入尺寸扫描配置
+
+| 配置 | 观测尺寸 | 说明 |
+|------|----------|------|
+| `configs/u6_mask_combined.yaml` | {128,96,64,48,32} | 单模型多尺寸（含上采样） |
+| `configs/size_sweep/u6_mask_size{32,64,96,128}.yaml` | 单一尺寸 | 每尺寸单独训练，便于隔离尺寸影响 |
+
+谱仍归一化到 512×257，因此尺寸只影响裁切/采样阶段。
+
+### 9.3 NPU 运行与提交
+
+`src/utils/device.py` 新增 CUDA/NPU/CPU 设备解析（train/eval/visualize 已接入）。
+
+> 提速：`src/data/preprocess_spectra.py` 的谱缓存生成原为单线程，现按 **(观测尺寸, 类别)** 分块用 `--workers N` 多进程并行（`0`=用满所有核）。每个 worker 只写 memmap 中自己那段不重叠的行，无需加锁；每块用**与 worker 数无关**的确定性种子，因此谱/标签/尺寸数组**与并行度无关、逐位一致**。`run_prepare_config.sh` 透传 `PREP_WORKERS`（默认 `0`）。
+>
+> ```bash
+> PREP_WORKERS=0 CONFIG=configs/size_sweep/u6_mask_size64.yaml bash scripts/run_prepare_config.sh
+> ```
+
+```bash
+cd spectral-mask-resampling
+
+# 单个配置完整管线（prepare→train→eval→viz），路径从配置自动推导
+CONFIG=configs/size_sweep/u6_mask_size64.yaml bash scripts/run_pipeline_config.sh
+
+# 交互节点：顺序跑全部尺寸
+bash scripts/run_size_sweep.sh
+
+# 集群 NPU：每个尺寸一个 vc 作业（需把 scripts/vc_mask_u6.sh 复制到 $CODES
+# 并把其中 `vc submit` 行从 vc_cnn_spectral_v1.sh 拷过来）
+bash scripts/submit_size_sweep_npu.sh
+
+# 本地冒烟
+LIMIT_IMAGES=4 SAMPLES_PER_CLASS_PER_SIZE=8 CONFIG=configs/size_sweep/u6_mask_size64.yaml \
+  bash scripts/run_pipeline_config.sh
+```
+
+### 9.4 跨方法尺寸效应汇总
+
+```bash
+cd ..
+python scripts/analysis/summarize_size_effect.py   # Mask vs CNN：准确率 vs 输入尺寸
+```
+输出 `test_results/size_effect/size_effect_combined.csv` 与 `size_effect.png`。

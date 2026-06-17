@@ -344,3 +344,96 @@ python evaluate_detector_on_dataset.py \
 | DCT/FFT 能否区分 JPEG vs ×8？ | 管线已实现，待大规模评估（test） |
 
 路线 A 的负结果直接推动了路线 B/C：**既然峰值距离 alone 不够，需要可学习表示或更丰富的特征（DCT、位置编码等）**。
+
+---
+
+## 新增：上采样 + 输入尺寸扫描
+
+为与 B/C 两条路线一致地补齐「上采样」与「输入尺寸影响」，新增脚本
+`scripts/analysis/classical_size_sweep.py`。它对每个观测（目标）尺寸 \(T\) **同时**
+合成两个方向的样本：
+
+- **下采样到 T**：source \(= T\cdot f\)（从更大图下采样）
+- **上采样到 T**：source \(= T/f\)（从更小图上采样，即此前缺失的 upsampling）
+
+随后跑 a-contrario 检测器，按 (尺寸, 方向) 统计「真源尺寸排到第 1 的比例」与最佳 NFA
+峰的显著度中位数，回答尺寸是否影响经典检测。
+
+```bash
+cd 4IM06-G3-Project22
+python scripts/analysis/classical_size_sweep.py \
+  --image-dir spectral-mask-resampling/data/raw/raise_tiff \
+  --limit-images 20 --target-sizes 256,384,512 --factors 2,4
+```
+输出 `test_results/classical_size_sweep/size_effect_summary.csv` 与 `size_effect.png`。
+经典路线为 CPU 计算，可在 CPU 计算节点运行。
+
+### 路线 A 的两个互补视角
+
+经典路线用**两个检测器**作为互补代表，分别在不同任务上做上采样 + 尺寸扫描：
+
+| 视角 | 检测器 | 任务 / 类别 | 上采样含义 | 尺寸扫描方式 |
+|------|--------|-------------|-----------|--------------|
+| A-1 NFA 尺寸恢复 | `resampling_core` + `run_controlled_resampling_experiments.py` | 估计源尺寸 / 是否重采样 | source < target（全局上采样到 T） | 扫目标尺寸 T（`classical_size_sweep.py`） |
+| A-2 JPEG-vs-重采样 | `jpeg_resample_detector.py`（DCT-FFT a-contrario） | original/jpeg/resample_x8/mix | 全局 ×2/×4 上采样（新增类别 `upsample_xN`） | 扫 `--max_size`（`jpeg_detector_size_sweep.py`） |
+
+A-2 的上采样实验：
+
+```bash
+# 1. 生成含上采样类别的取证后处理数据集
+python create_forensic_postprocess_dataset.py \
+  --input_dir <png_dir> --output_dir test_results/forensic_pp \
+  --include_original --include_upsampling --mix_order both
+
+# 2. 输入尺寸扫描（CPU）
+python scripts/analysis/jpeg_detector_size_sweep.py \
+  --dataset-root test_results/forensic_pp \
+  --null-dir test_results/forensic_pp/original \
+  --max-sizes 128,256,512
+```
+
+> 注意：`jpeg_resample_detector.py` 的 a-contrario 检验只针对 **period-8** 结构，没有原生"上采样"输出类别。因此 `upsample_xN` 样本会落到 `original_or_uncertain` / 重采样等类别——这一混淆本身就是要报告的结果（该检测器对全局上采样不敏感），与 Mask/CNN 的全局缩放任务形成对比。
+
+### 提速：多核并行（保持结果一致）
+
+路线 A 为纯 CPU 计算，已加入多进程并行，结果与单进程**逐位一致**（仅并行化任务划分，不改变检测逻辑/标签/计数）：
+
+- `evaluate_detector_on_dataset.py`：改为**进程内**直接调用检测器（不再每张图起一个 `python` 子进程），null 经验分布**只构建一次**全程复用，并用 `--workers N` 在多核上并行评估（`0`=用满所有核，`1`=单进程）。新增 `--null_max_images` 控制 null 样本数。
+- `run_controlled_resampling_experiments.py`：按**图像**并行（`--workers N`），各图像只写自己的子目录，汇总 `summary.csv` 由主进程按原顺序集中写出，因此与串行版本完全一致。
+- `classical_size_sweep.py` / `jpeg_detector_size_sweep.py`：均新增 `--workers` 并透传给上面的脚本。
+
+```bash
+# NFA 尺寸扫描：每个目标尺寸内按图像多核并行
+python scripts/analysis/classical_size_sweep.py \
+  --image-dir spectral-mask-resampling/data/raw/raise_tiff \
+  --limit-images 20 --target-sizes 256,384,512 --factors 2,4 --workers 0
+
+# DCT-FFT 尺寸扫描：每个 max_size 内多核并行评估
+python scripts/analysis/jpeg_detector_size_sweep.py \
+  --dataset-root test_results/forensic_pp \
+  --null-dir test_results/forensic_pp/original \
+  --max-sizes 128,256,512 --workers 0
+```
+
+> NFA 并行用 `pool.map` 保序，源尺寸恢复率 / NFA 显著度等指标与单进程一致；评估器并行也保序（每张图的 `true/pred` 顺序不变），准确率与混淆矩阵不变。
+
+### 三方法统一对比（同一张图）
+
+三条路线的"原生任务"不同（经典 = period-8 / 源尺寸恢复；Mask/CNN = 6 类分类），无法用同一个 6 类准确率直接比。为此引入一个对三者都公平、且能在同一输入尺寸轴上计算的**共同二分类**：
+
+> **「是否被几何重采样（上/下采样）」 vs 「原图」**（`original` 与仅 JPEG 压缩都算"未重采样"负类）。
+
+- Mask / CNN：把各自每尺寸保存的 6×6 `confusion_matrix` 折叠为 {重采样 = `downsample_*`/`upsample_*`} vs {否 = `original`/`JPEG`}。
+- 经典（A-2 DCT-FFT）：`evaluate_detector_on_dataset.py` 新增 `--json_out`，输出 `binary_resampling_accuracy`；`jpeg_detector_size_sweep.py` 每个 `max_size` 写一份 `eval_size{N}.json`。
+
+```bash
+cd 4IM06-G3-Project22
+# 经典 A-2 在与 B/C 相同的尺寸轴上评估
+python scripts/analysis/jpeg_detector_size_sweep.py \
+  --dataset-root test_results/forensic_pp \
+  --null-dir test_results/forensic_pp/original \
+  --max-sizes 32,64,96,128 --workers 0
+# 把三方法画到同一张图 + CSV
+python scripts/analysis/unified_method_comparison.py --sizes 32,64,96,128
+```
+输出 `test_results/unified_comparison/unified_comparison.{csv,png}`：三条曲线（classical / mask / cnn）的"重采样检出"二分类准确率 vs 输入尺寸；Mask/CNN 的 6 类准确率作为附列保留。`summarize_size_effect.py` 仍提供 B/C 在完整 6 类上的同指标对比。
