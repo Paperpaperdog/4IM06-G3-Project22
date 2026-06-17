@@ -7,12 +7,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-cpu}"
 
+# Prepare imports used by preprocess_spectra (tv residual + spectrum).
+PREPARE_IMPORTS="import PIL, numpy, torch, skimage, yaml, tqdm"
+
 venv_ok() {
-  [[ -x "$1/bin/python" ]] && "$1/bin/python" -c "import PIL, numpy, torch" >/dev/null 2>&1
+  [[ -x "$1/bin/python" ]] && "$1/bin/python" -c "$PREPARE_IMPORTS" >/dev/null 2>&1
 }
 
 resolve_cpu() {
-  if [[ -n "${PYTHON:-}" ]] && "$PYTHON" -c "import PIL, numpy, torch" >/dev/null 2>&1; then
+  if [[ -n "${PYTHON:-}" ]] && "$PYTHON" -c "$PREPARE_IMPORTS" >/dev/null 2>&1; then
     echo "Using PYTHON=$PYTHON (cpu/prepare)"
     return 0
   fi
@@ -24,14 +27,13 @@ resolve_cpu() {
       return 0
     fi
   done
-  if command -v python3 >/dev/null 2>&1 && python3 -c "import PIL, numpy, torch" >/dev/null 2>&1; then
+  if command -v python3 >/dev/null 2>&1 && python3 -c "$PREPARE_IMPORTS" >/dev/null 2>&1; then
     echo "Using system python3 (cpu/prepare)"
     return 0
   fi
-  echo "ERROR: no Python with PIL+numpy+torch for prepare." >&2
-  echo "  Create a venv and install deps:" >&2
-  echo "    cd $ROOT && python3 -m venv .venv && source .venv/bin/activate" >&2
-  echo "    pip install -r requirements.txt" >&2
+  echo "ERROR: no Python with prepare deps (PIL, numpy, torch, skimage, yaml, tqdm)." >&2
+  echo "  On the cluster, create the project venv once:" >&2
+  echo "    cd $ROOT && bash scripts/setup_cpu_venv.sh" >&2
   return 1
 }
 
