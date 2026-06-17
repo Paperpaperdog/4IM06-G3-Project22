@@ -68,7 +68,7 @@ def save_gradient_saliency(
 ) -> None:
     saliency_dir = ensure_dir(figures_dir)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    accum = {i: np.zeros((1, 64, 33), dtype=np.float64) for i in range(len(class_names))}
+    accum: dict[int, np.ndarray | None] = {i: None for i in range(len(class_names))}
     counts = {i: 0 for i in range(len(class_names))}
 
     model.eval()
@@ -99,11 +99,13 @@ def save_gradient_saliency(
             class_id = int(y_cpu[i])
             if counts[class_id] >= max_per_class:
                 continue
+            if accum[class_id] is None:
+                accum[class_id] = np.zeros_like(grad[i], dtype=np.float64)
             accum[class_id] += grad[i]
             counts[class_id] += 1
 
     for class_id, class_name in enumerate(class_names):
-        if counts[class_id] == 0:
+        if counts[class_id] == 0 or accum[class_id] is None:
             print(f"No correctly classified samples found for saliency class {class_name}.")
             continue
         saliency = accum[class_id] / counts[class_id]

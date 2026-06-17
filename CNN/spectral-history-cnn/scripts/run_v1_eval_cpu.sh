@@ -51,10 +51,14 @@ log "python=$PY"
   --checkpoint "$CKPT" \
   --split "$SPLIT" 2>&1 | tee -a "$LOG_FILE"
 
-"$PY" src/visualize.py \
+if "$PY" src/visualize.py \
   --config "$CONFIG" \
   --device "$DEVICE" \
   --checkpoint "$CKPT" \
-  --split "$SPLIT" 2>&1 | tee -a "$LOG_FILE"
+  --split "$SPLIT" 2>&1 | tee -a "$LOG_FILE"; then
+  log "visualize OK"
+else
+  log "WARN: visualize skipped (metrics already saved)"
+fi
 
 log "=== done: $OUTPUT_DIR/metrics.json ==="
