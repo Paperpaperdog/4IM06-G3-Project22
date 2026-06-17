@@ -6,6 +6,14 @@ __pycache__/
 .matplotlib-cache/
 .DS_Store
 
+# Unified results tree (results/<method>/...): keep the folder skeleton, ignore
+# run artifacts (checkpoints, caches, figures). Commit specific metrics by adding
+# an explicit "!results/.../metrics.json" exception if needed.
+results/**
+!results/
+!results/*/
+!results/**/.gitkeep
+
 # Local demo / paper assets
 *.pdf
 RAISE_1k.csv

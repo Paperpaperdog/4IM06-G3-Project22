@@ -8,8 +8,10 @@
 #
 # Background (detached, progress via tail):
 #   bash scripts/analysis/run_classical_pipeline.sh --detach
-#   tail -f test_results/classical_pipeline_logs/latest/pipeline.log
-#   cat  test_results/classical_pipeline_logs/latest/progress.txt
+#   tail -f results/classical/pipeline_logs/latest/pipeline.log
+#   cat  results/classical/pipeline_logs/latest/progress.txt
+#
+# Outputs live under results/: classical/ (this route) and comparison/ (3-method).
 #
 # Options via env:
 #   SKIP_NFA=1              skip classical_size_sweep (step 3)
@@ -17,7 +19,7 @@
 #   LIMIT_IMAGES=20         passed to classical_size_sweep
 #   WORKERS=0               parallel workers (0 = all cores)
 #   FORENSIC_INPUT=...      default: spectral-mask-resampling/data/raw/raise_tiff
-#   FORENSIC_OUT=...        default: test_results/forensic_pp
+#   FORENSIC_OUT=...        default: results/classical/forensic_pp
 #   FORENSIC_LIMIT=100      cap step-1 images (omit = all TIFFs)
 #
 # n6 protocol: forensic dataset uses upsample factors 4,8 (matching the learnable
@@ -35,7 +37,7 @@ cd "$PROJECT_ROOT"
 if [[ "${1:-}" == "--detach" ]]; then
   shift
   RUN_ID="$(date +%Y%m%d_%H%M%S)"
-  LOG_ROOT="${LOG_ROOT:-test_results/classical_pipeline_logs}"
+  LOG_ROOT="${LOG_ROOT:-results/classical/pipeline_logs}"
   LOG_DIR="$LOG_ROOT/$RUN_ID"
   mkdir -p "$LOG_DIR"
   ln -sfn "$RUN_ID" "$LOG_ROOT/latest"
@@ -69,7 +71,7 @@ fi
 # Config (overridable via environment)
 # ---------------------------------------------------------------------------
 RUN_ID="${RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
-LOG_ROOT="${LOG_ROOT:-test_results/classical_pipeline_logs}"
+LOG_ROOT="${LOG_ROOT:-results/classical/pipeline_logs}"
 LOG_DIR="${LOG_DIR:-$LOG_ROOT/$RUN_ID}"
 mkdir -p "$LOG_DIR"
 ln -sfn "$(basename "$LOG_DIR")" "$LOG_ROOT/latest" 2>/dev/null || true
@@ -81,16 +83,16 @@ PID_FILE="$LOG_DIR/pipeline.pid"
 echo $$ > "$PID_FILE"
 
 FORENSIC_INPUT="${FORENSIC_INPUT:-spectral-mask-resampling/data/raw/raise_tiff}"
-NFA_OUT="${NFA_OUT:-test_results/classical_size_sweep}"
+NFA_OUT="${NFA_OUT:-results/classical/classical_size_sweep}"
 MAX_SIZES="${MAX_SIZES:-32,64,96,128}"
 LIMIT_IMAGES="${LIMIT_IMAGES:-20}"
 WORKERS="${WORKERS:-0}"
 SKIP_NFA="${SKIP_NFA:-0}"
 SKIP_UNIFIED="${SKIP_UNIFIED:-0}"
 FORENSIC_LIMIT="${FORENSIC_LIMIT:-}"
-FORENSIC_OUT="${FORENSIC_OUT:-test_results/forensic_pp}"
-JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-test_results/jpeg_detector_size_sweep}"
-UNIFIED_OUT="${UNIFIED_OUT:-test_results/unified_comparison}"
+FORENSIC_OUT="${FORENSIC_OUT:-results/classical/forensic_pp}"
+JPEG_SWEEP_OUT="${JPEG_SWEEP_OUT:-results/classical/jpeg_detector_size_sweep}"
+UNIFIED_OUT="${UNIFIED_OUT:-results/comparison/unified_comparison}"
 FORENSIC_UPSAMPLE_FACTORS="${FORENSIC_UPSAMPLE_FACTORS:-4,8}"
 
 export PYTHONUNBUFFERED=1

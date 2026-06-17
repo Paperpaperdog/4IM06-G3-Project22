@@ -365,7 +365,7 @@ python scripts/analysis/classical_size_sweep.py \
   --image-dir spectral-mask-resampling/data/raw/raise_tiff \
   --limit-images 20 --target-sizes 256,384,512 --factors 2,4
 ```
-输出 `test_results/classical_size_sweep/size_effect_summary.csv` 与 `size_effect.png`。
+输出 `results/classical/classical_size_sweep/size_effect_summary.csv` 与 `size_effect.png`。
 经典路线为 CPU 计算，可在 CPU 计算节点运行。
 
 ### 路线 A 的两个互补视角
@@ -382,13 +382,13 @@ A-2 的上采样实验：
 ```bash
 # 1. 生成含上采样类别的取证后处理数据集
 python create_forensic_postprocess_dataset.py \
-  --input_dir <png_dir> --output_dir test_results/forensic_pp \
+  --input_dir <png_dir> --output_dir results/classical/forensic_pp \
   --include_original --include_upsampling --mix_order both
 
 # 2. 输入尺寸扫描（CPU）
 python scripts/analysis/jpeg_detector_size_sweep.py \
-  --dataset-root test_results/forensic_pp \
-  --null-dir test_results/forensic_pp/original \
+  --dataset-root results/classical/forensic_pp \
+  --null-dir results/classical/forensic_pp/original \
   --max-sizes 128,256,512
 ```
 
@@ -410,8 +410,8 @@ python scripts/analysis/classical_size_sweep.py \
 
 # DCT-FFT 尺寸扫描：每个 max_size 内多核并行评估
 python scripts/analysis/jpeg_detector_size_sweep.py \
-  --dataset-root test_results/forensic_pp \
-  --null-dir test_results/forensic_pp/original \
+  --dataset-root results/classical/forensic_pp \
+  --null-dir results/classical/forensic_pp/original \
   --max-sizes 128,256,512 --workers 0
 ```
 
@@ -430,13 +430,13 @@ python scripts/analysis/jpeg_detector_size_sweep.py \
 cd 4IM06-G3-Project22
 # 经典 A-2 在与 B/C 相同的尺寸轴上评估
 python scripts/analysis/jpeg_detector_size_sweep.py \
-  --dataset-root test_results/forensic_pp \
-  --null-dir test_results/forensic_pp/original \
+  --dataset-root results/classical/forensic_pp \
+  --null-dir results/classical/forensic_pp/original \
   --max-sizes 32,64,96,128 --workers 0
 # 把三方法画到同一张图 + CSV
 python scripts/analysis/unified_method_comparison.py --sizes 32,64,96,128
 ```
-输出 `test_results/unified_comparison/unified_comparison.{csv,png}`：三条曲线（classical / mask / cnn）的"重采样检出"二分类准确率 vs 输入尺寸；Mask/CNN 的 6 类准确率作为附列保留。`summarize_size_effect.py` 仍提供 B/C 在完整 6 类上的同指标对比。
+输出 `results/comparison/unified_comparison/unified_comparison.{csv,png}`：三条曲线（classical / mask / cnn）的"重采样检出"二分类准确率 vs 输入尺寸；Mask/CNN 的 6 类准确率作为附列保留。`summarize_size_effect.py` 仍提供 B/C 在完整 6 类上的同指标对比。
 
 ### 当前主协议 `n6`：一键经典管线
 
@@ -445,11 +445,12 @@ python scripts/analysis/unified_method_comparison.py --sizes 32,64,96,128
 ```bash
 cd 4IM06-G3-Project22
 bash scripts/analysis/run_classical_pipeline.sh --detach
-# 监控：tail -f test_results/classical_pipeline_logs/latest/pipeline.log
+# 监控：tail -f results/classical/pipeline_logs/latest/pipeline.log
 ```
 
 管线默认把上采样因子设为 `4,8`（对齐 `upsample_x4` / `upsample_x8`），结果写入
-`test_results/{forensic_pp, jpeg_detector_size_sweep, unified_comparison}`。手动跑统一对比：
+`results/classical/{forensic_pp, jpeg_detector_size_sweep, classical_size_sweep}`
+与 `results/comparison/unified_comparison`。手动跑统一对比：
 
 ```bash
 python scripts/analysis/unified_method_comparison.py --sizes 32,64,96,128

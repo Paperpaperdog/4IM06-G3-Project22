@@ -165,7 +165,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--image-dir", type=Path, default=Path("spectral-mask-resampling/data/raw/raise_tiff"))
     parser.add_argument("--raise-csv", type=Path, default=Path("data/raise_raw/RAISE_1k.csv"))
-    parser.add_argument("--outdir-root", type=Path, default=Path("test_results/classical_size_sweep"))
+    parser.add_argument("--outdir-root", type=Path, default=Path("results/classical/classical_size_sweep"))
     parser.add_argument("--limit-images", type=int, default=20)
     parser.add_argument("--target-sizes", default="32,64,96,128",
                         help="Observed sizes aligned with Mask/CNN size sweep.")

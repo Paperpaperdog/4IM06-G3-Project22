@@ -5,7 +5,7 @@
 # Note: downsample_x16 crops 16*128 = 2048 px from each source TIFF.
 experiment_name: n6_mask_size128
 data_dir: data/processed/n6_mask_size128
-output_dir: outputs/n6_mask_size128
+output_dir: ../results/mask/n6_mask_size128
 
 num_classes: 6
 class_names:

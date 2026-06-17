@@ -13,12 +13,12 @@ Run (CPU):
   cd 4IM06-G3-Project22
   # 1. build dataset with upsampling
   python create_forensic_postprocess_dataset.py \
-    --input_dir <png_dir> --output_dir test_results/forensic_pp --include_original \
+    --input_dir <png_dir> --output_dir results/classical/forensic_pp --include_original \
     --include_upsampling --mix_order both
   # 2. sweep input size
   python scripts/analysis/jpeg_detector_size_sweep.py \
-    --dataset-root test_results/forensic_pp \
-    --null-dir test_results/forensic_pp/original
+    --dataset-root results/classical/forensic_pp \
+    --null-dir results/classical/forensic_pp/original
 """
 
 from __future__ import annotations

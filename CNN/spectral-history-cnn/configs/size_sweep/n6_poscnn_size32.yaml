@@ -8,7 +8,7 @@ paths:
   image_cache_dir: ../../spectral-mask-resampling/data/raw/raise_tiff
   split_json: data/splits/raise_split_seed123_local.json
   processed_dir: data/processed/n6_tv_rfft_size32
-  output_dir: outputs/n6_poscnn_size32
+  output_dir: ../../results/cnn/n6_poscnn_size32
 
 data:
   final_size: 32

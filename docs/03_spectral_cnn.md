@@ -334,7 +334,7 @@ CNN 一向用原生谱，因此本路线改动很小，主要是统一类别集�
 
 配置：`configs/size_sweep/n6_poscnn_size{32,64,96,128}.yaml`——每个尺寸一个配置，
 `final_size` 与 `spectrum.height/width/width_rfft` 随之变化，`num_classes: 6`，
-独立缓存 `data/processed/n6_tv_rfft_size*`、输出 `outputs/n6_poscnn_size*`。管线脚本
+独立缓存 `data/processed/n6_tv_rfft_size*`、输出到项目级 `results/cnn/n6_poscnn_size*`。管线脚本
 **从配置自动推导输出目录**，所以集群 `vc_cnn_spectral_v1.sh` 只要设 `CONFIG` 即可。
 
 ```bash
@@ -357,4 +357,4 @@ cd ../..
 python scripts/analysis/summarize_size_effect.py      # Mask vs CNN：准确率 vs 输入尺寸
 python scripts/analysis/unified_method_comparison.py  # 三方法在二分轴上的对比
 ```
-输出 `test_results/size_effect/` 与 `test_results/unified_comparison/`。
+输出 `results/comparison/size_effect/` 与 `results/comparison/unified_comparison/`。

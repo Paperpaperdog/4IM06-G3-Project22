@@ -10,7 +10,7 @@ Telecom Paris IM06 课程项目：从频域/残差域痕迹判断图像是否经
 | **B. Mask** | `spectral-mask-resampling/` | 可学习频域 mask，4 类分类 |
 | **C. CNN** | `CNN/spectral-history-cnn/` | 位置编码频谱 CNN |
 
-**实验总结（DL）**：[`EXPERIMENT_SUMMARY.md`](EXPERIMENT_SUMMARY.md) · **W3 先导报告**：[`REPORT.zh.md`](REPORT.zh.md) · **周会**：[`SUIVI.md`](SUIVI.md)
+**实验总结（DL）**：[`EXPERIMENT_SUMMARY.md`](EXPERIMENT_SUMMARY.md) · **n6 运行汇总（配置/脚本/命令）**：[`docs/EXPERIMENT_RUNBOOK.md`](docs/EXPERIMENT_RUNBOOK.md) · **W3 先导报告**：[`REPORT.zh.md`](REPORT.zh.md) · **周会**：[`SUIVI.md`](SUIVI.md)
 
 **详细方法文档**（流程图 + 数据处理 + 我们的实验）：
 
@@ -96,7 +96,7 @@ python evaluate_detector_on_dataset.py --detector jpeg_resample_detector.py --da
 当前主协议 `n6`：原生 rFFT 谱、6 类、每个观测尺寸单独训练。
 
 - **配置**：`configs/size_sweep/n6_mask_size{32,64,96,128}.yaml`
-- **输出**：`outputs/n6_mask_size*`
+- **输出**：`results/mask/n6_mask_size*`
 
 ```bash
 cd spectral-mask-resampling

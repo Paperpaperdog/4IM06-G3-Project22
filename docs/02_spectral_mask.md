@@ -324,7 +324,7 @@ v1（512×257 归一化频率网格、4 类）的配置与流水线脚本已移�
 ### 9.3 配置与运行
 
 配置：`configs/size_sweep/n6_mask_size{32,64,96,128}.yaml`（独立缓存
-`data/processed/n6_mask_size*`、输出 `outputs/n6_mask_size*`）。
+`data/processed/n6_mask_size*`、输出到项目级 `results/mask/n6_mask_size*`）。
 
 ```bash
 cd spectral-mask-resampling
@@ -350,4 +350,4 @@ LIMIT_IMAGES=4 SAMPLES_PER_CLASS_PER_SIZE=8 \
 cd ..
 python scripts/analysis/summarize_size_effect.py
 ```
-输出 `test_results/size_effect/`（Mask vs CNN 在 `n6` 6 类上的准确率-尺寸曲线）。
+输出 `results/comparison/size_effect/`（Mask vs CNN 在 `n6` 6 类上的准确率-尺寸曲线）。

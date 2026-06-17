@@ -67,11 +67,11 @@ def binary_accuracy_from_confusion(confusion: list[list[float]], class_names: li
 
 LEARNABLE = {
     "mask": {
-        "metrics": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / "n6_mask_size{size}" / "metrics.json",
+        "metrics": PROJECT_ROOT / "results" / "mask" / "n6_mask_size{size}" / "metrics.json",
         "config": PROJECT_ROOT / "spectral-mask-resampling" / "configs" / "size_sweep" / "n6_mask_size{size}.yaml",
     },
     "cnn": {
-        "metrics": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / "n6_poscnn_size{size}" / "metrics.json",
+        "metrics": PROJECT_ROOT / "results" / "cnn" / "n6_poscnn_size{size}" / "metrics.json",
         "config": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "configs" / "size_sweep" / "n6_poscnn_size{size}.yaml",
     },
 }
@@ -83,11 +83,11 @@ def main() -> None:
     parser.add_argument(
         "--classical-eval-dir",
         type=Path,
-        default=PROJECT_ROOT / "test_results" / "jpeg_detector_size_sweep_n6",
+        default=PROJECT_ROOT / "results" / "classical" / "jpeg_detector_size_sweep",
         help="Dir with eval_size{size}.json from jpeg_detector_size_sweep.py "
              "(run it with --max-sizes equal to --sizes here).",
     )
-    parser.add_argument("--outdir", type=Path, default=PROJECT_ROOT / "test_results" / "unified_comparison")
+    parser.add_argument("--outdir", type=Path, default=PROJECT_ROOT / "results" / "comparison" / "unified_comparison")
     args = parser.parse_args()
 
     learnable = LEARNABLE

@@ -27,8 +27,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def method_paths() -> dict[str, Path]:
     return {
-        "mask": PROJECT_ROOT / "spectral-mask-resampling" / "outputs" / "n6_mask_size{size}" / "metrics.json",
-        "cnn": PROJECT_ROOT / "CNN" / "spectral-history-cnn" / "outputs" / "n6_poscnn_size{size}" / "metrics.json",
+        "mask": PROJECT_ROOT / "results" / "mask" / "n6_mask_size{size}" / "metrics.json",
+        "cnn": PROJECT_ROOT / "results" / "cnn" / "n6_poscnn_size{size}" / "metrics.json",
     }
 
 
@@ -55,7 +55,7 @@ def main() -> None:
     args = parser.parse_args()
 
     methods = method_paths()
-    args.outdir = args.outdir or (PROJECT_ROOT / "test_results" / "size_effect")
+    args.outdir = args.outdir or (PROJECT_ROOT / "results" / "comparison" / "size_effect")
 
     sizes = [int(s) for s in args.sizes.split(",") if s.strip()]
     args.outdir.mkdir(parents=True, exist_ok=True)
