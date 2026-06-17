@@ -160,15 +160,39 @@ python scripts/analysis/classical_size_sweep.py \
 
 ### 5.2 预处理（与 CNN 共用，每尺寸一遍）
 
-推荐在项目根执行（Mask/CNN 读同一目录）：
+**推荐入口** `scripts/submit_prepare_n6.sh`（支持并行、后台、集群提交）。
 
 ```bash
 cd 4IM06-G3-Project22
+
+# 单尺寸（前台）
+SIZE=64 bash scripts/submit_prepare_n6.sh
+
+# 四尺寸并行（本机多核 / 计算节点上最快）
+PARALLEL_SIZES=1 bash scripts/submit_prepare_n6.sh
+# 或
+bash scripts/submit_prepare_n6.sh --parallel
+
+# 后台 detached（防 SSH 断线）
+bash scripts/submit_prepare_n6.sh --detach --parallel
+tail -f logs/prepare_n6/submit_*.log
+
+# 集群：每个尺寸一个 CPU vc 作业（需先把 scripts/vc_prepare_n6.sh 拷到 $CODES）
+CODES=/path/to/Codes CPU_PER_TASK=16 bash scripts/submit_prepare_n6.sh --cluster
+
+# 简写（顺序跑）
 SIZE=64 bash scripts/prepare_n6_spectra.sh
-SIZES="32 64 96 128" bash scripts/prepare_n6_spectra.sh
+SIZES="32 64 96 128" PARALLEL_SIZES=1 bash scripts/prepare_n6_spectra.sh
 ```
 
-等价于在 mask 子目录：`CONFIG=configs/size_sweep/n6_mask_size64.yaml bash scripts/run_prepare_config.sh`
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `PREP_WORKERS` | `0` | 单尺寸内并行 class 块；`0`=用满核（最多 6 worker/split） |
+| `PARALLEL_SIZES` | `0` | `1` 时四尺寸同时跑（**提速最明显**） |
+| `CPU_PER_TASK` | `8` | 集群 `--cluster` 时申请 CPU 核数 |
+| `FORCE_PREPARE` | `0` | `1` 时覆盖已有缓存 |
+
+输出：`data/processed/n6_spectra_size{N}/`。完成后训练用 `SKIP_PREPARE=1`。
 
 ### 5.3 单尺寸完整管线
 
@@ -393,7 +417,7 @@ python scripts/plot_mask_results.py \
 A：先确认 `results/mask/n6_mask_size*/metrics.json` 与 `results/cnn/n6_poscnn_size*/metrics.json` 存在；`unified_method_comparison.py` 会跳过缺失尺寸并打印 `[skip]`。
 
 **Q：Mask prepare 很慢？**  
-A：设 `PREP_WORKERS=0`（默认）用满 CPU 核；四尺寸可并行提交 4 个 prepare 作业（不同 `CONFIG`）。
+A：用 `bash scripts/submit_prepare_n6.sh --parallel` 四尺寸并行；集群用 `--cluster` 每尺寸申一个 **CPU** 作业（`vc_prepare_n6.sh`）。`PREP_WORKERS=0` 单尺寸内最多 ~6 核（6 类并行）。完成后 `SKIP_PREPARE=1` 再训 NPU。
 
 **Q：集群上 Mask 提交失败「vc wrapper not found」？**  
 A：将 `spectral-mask-resampling/scripts/vc_mask.sh` 复制到 `$CODES/vc_mask.sh`，并按其中注释把 `vc submit` 行从 `vc_cnn_spectral_v1.sh` 拷过来。

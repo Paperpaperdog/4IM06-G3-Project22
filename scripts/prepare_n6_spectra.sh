@@ -3,26 +3,25 @@
 #
 #   SIZE=64 bash scripts/prepare_n6_spectra.sh
 #   SIZES="32 64 96 128" bash scripts/prepare_n6_spectra.sh
-#   LIMIT_IMAGES=4 SAMPLES_PER_CLASS_PER_SIZE=8 SIZE=64 bash scripts/prepare_n6_spectra.sh
+#   PARALLEL_SIZES=1 bash scripts/prepare_n6_spectra.sh   # four sizes at once
+#   bash scripts/submit_prepare_n6.sh --detach --parallel  # background + parallel
+#
+# For cluster CPU jobs see: scripts/submit_prepare_n6.sh --cluster
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MASK_ROOT="$REPO_ROOT/spectral-mask-resampling"
+export REPO_ROOT
 SIZES="${SIZES:-${SIZE:-64}}"
+PREP_WORKERS="${PREP_WORKERS:-0}"
+PARALLEL_SIZES="${PARALLEL_SIZES:-0}"
+
+if [[ "$PARALLEL_SIZES" == "1" ]]; then
+  exec bash "$REPO_ROOT/scripts/submit_prepare_n6.sh" --parallel
+fi
 
 for size in $SIZES; do
-  cfg="$MASK_ROOT/configs/size_sweep/n6_mask_size${size}.yaml"
-  if [[ ! -f "$cfg" ]]; then
-    echo "SKIP: missing $cfg" >&2
-    continue
-  fi
-  cache="$REPO_ROOT/data/processed/n6_spectra_size${size}"
-  echo "=== prepare shared spectra: size=$size -> $cache ==="
-  (
-    cd "$MASK_ROOT"
-    CONFIG="configs/size_sweep/n6_mask_size${size}.yaml" \
-      bash scripts/run_prepare_config.sh
-  )
+  SIZE="$size" PREP_WORKERS="$PREP_WORKERS" \
+    bash "$REPO_ROOT/scripts/prepare_n6_worker.sh"
 done
 
 echo "Done. Mask and CNN both read: data/processed/n6_spectra_size{N}/"
