@@ -21,6 +21,7 @@ export VENV_DIR="${VENV_DIR:-${REPO_ROOT/-integration/}/spectral-mask-resampling
 
 CONFIG="${CONFIG:?Set CONFIG=configs/size_sweep/u6_mask_size64.yaml}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
+EVAL_ONLY="${EVAL_ONLY:-0}"
 
 LOG_DIR="$ROOT/logs"
 mkdir -p "$LOG_DIR"
@@ -33,9 +34,9 @@ DEVICE_NAME="$(grep -E '^[[:space:]]*device:[[:space:]]*' "$CONFIG" | head -1 | 
 DEVICE_NAME="${DEVICE_NAME:-npu}"
 
 log "=== mask pipeline start ==="
-log "CONFIG=$CONFIG DEVICE=$DEVICE_NAME SKIP_PREPARE=$SKIP_PREPARE CNN_ROOT=$CNN_ROOT"
+log "CONFIG=$CONFIG DEVICE=$DEVICE_NAME SKIP_PREPARE=$SKIP_PREPARE EVAL_ONLY=$EVAL_ONLY CNN_ROOT=$CNN_ROOT"
 
-if [[ "$SKIP_PREPARE" != "1" ]]; then
+if [[ "$EVAL_ONLY" != "1" && "$SKIP_PREPARE" != "1" ]]; then
   # shellcheck disable=SC1091
   source "$ROOT/scripts/resolve_python.sh" cpu
   PREP_PY="${PYTHON:-python3}"
@@ -47,6 +48,10 @@ if [[ "$SKIP_PREPARE" != "1" ]]; then
   fi
 else
   log "SKIP_PREPARE=1, using existing cache"
+fi
+
+if [[ "$EVAL_ONLY" == "1" ]]; then
+  log "EVAL_ONLY=1, skipping train (reuse existing checkpoint)"
 fi
 
 if [[ "$DEVICE_NAME" == "npu" ]]; then
@@ -63,8 +68,16 @@ OUTPUT_DIR="$("$PY" -c "import yaml;print(yaml.safe_load(open('$CONFIG'))['outpu
 CKPT="$OUTPUT_DIR/checkpoints/best.pt"
 log "OUTPUT_DIR=$OUTPUT_DIR"
 
-log "train"
-"$PY" src/train.py --config "$CONFIG" 2>&1 | tee -a "$LOG_FILE"
+if [[ "$EVAL_ONLY" != "1" ]]; then
+  log "train"
+  "$PY" src/train.py --config "$CONFIG" 2>&1 | tee -a "$LOG_FILE"
+else
+  if [[ ! -f "$CKPT" ]]; then
+    log "ERROR: EVAL_ONLY=1 but checkpoint missing: $CKPT"
+    exit 1
+  fi
+  log "train skipped (EVAL_ONLY=1), using $CKPT"
+fi
 
 log "eval"
 if "$PY" src/evaluate.py --config "$CONFIG" --checkpoint "$CKPT" --split test 2>&1 | tee -a "$LOG_FILE"; then

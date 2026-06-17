@@ -22,6 +22,7 @@ fi
 
 export CONFIG="${CONFIG:-configs/u6_mask_combined.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
+export EVAL_ONLY="${EVAL_ONLY:-0}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
 if grep -qE '^[[:space:]]*device:[[:space:]]*npu' "$ROOT/$CONFIG" 2>/dev/null; then
   export PYTHONNOUSERSITE=1
@@ -33,6 +34,6 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/vc_mask_${TS}.log"
 
 echo "[$(date '+%F %T')] mask vc_worker start CONFIG=$CONFIG" | tee "$LOG_FILE"
-echo "REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR RAISE_TIFF_DIR=$RAISE_TIFF_DIR SKIP_PREPARE=$SKIP_PREPARE" | tee -a "$LOG_FILE"
+echo "REPO_ROOT=$REPO_ROOT CNN_ROOT=$CNN_ROOT VENV_DIR=$VENV_DIR RAISE_TIFF_DIR=$RAISE_TIFF_DIR SKIP_PREPARE=$SKIP_PREPARE EVAL_ONLY=$EVAL_ONLY" | tee -a "$LOG_FILE"
 bash "$ROOT/scripts/run_pipeline_config.sh" 2>&1 | tee -a "$LOG_FILE"
 echo "[$(date '+%F %T')] mask vc_worker done" | tee -a "$LOG_FILE"

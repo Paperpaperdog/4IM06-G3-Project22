@@ -28,6 +28,7 @@ WORKER="$MASK_ROOT/scripts/vc_worker.sh"
 export REPO_ROOT CNN_ROOT VENV_DIR
 export CONFIG="${CONFIG:-configs/u6_mask_combined.yaml}"
 export SKIP_PREPARE="${SKIP_PREPARE:-0}"
+export EVAL_ONLY="${EVAL_ONLY:-0}"
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
 JOB="${JOB:-mask_u6}"
 CPU_PER_TASK="${CPU_PER_TASK:-20}"

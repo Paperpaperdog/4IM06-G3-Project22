@@ -21,6 +21,7 @@ CODES="${CODES:-/aistor/sjtu/hpc_stor01/home/jinbingrui/Codes}"
 VC_WRAPPER="${VC_WRAPPER:-vc_mask_u6.sh}"
 SIZES="${SIZES:-32 64 96 128}"
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
+EVAL_ONLY="${EVAL_ONLY:-0}"
 
 if [[ ! -d "$CODES" ]]; then
   echo "ERROR: cluster Codes dir not found: $CODES" >&2
@@ -47,6 +48,7 @@ for size in $SIZES; do
   VENV_DIR="$VENV_DIR" \
   CONFIG="$cfg" \
   SKIP_PREPARE="$SKIP_PREPARE" \
+  EVAL_ONLY="$EVAL_ONLY" \
   JOB="mask_u6_size${size}" \
   bash "$VC_WRAPPER"
 done
