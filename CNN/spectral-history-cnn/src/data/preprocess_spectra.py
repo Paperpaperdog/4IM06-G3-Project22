@@ -22,16 +22,45 @@ from src.utils.io import ensure_dir, load_json, load_yaml, save_json, update_nes
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-CLASS_CROP_SIZES = {
-    "original": 64,
-    "JPEG": 64,
-    "downsample_x2": 128,
-    "downsample_x4": 256,
-    "downsample_x8": 512,
-    "downsample_x16": 1024,
-}
-
 SPLIT_SEED_OFFSETS = {"train": 0, "val": 100_000, "test": 200_000}
+
+
+def parse_scale_factor(class_name: str, prefix: str) -> int | None:
+    if not class_name.startswith(prefix):
+        return None
+    raw = class_name[len(prefix) :]
+    if not raw.isdigit():
+        return None
+    factor = int(raw)
+    if factor <= 0:
+        return None
+    return factor
+
+
+def get_crop_size_for_class(class_name: str, final_size: int) -> int:
+    if class_name in {"original", "JPEG"}:
+        return int(final_size)
+
+    down_factor = parse_scale_factor(class_name, "downsample_x")
+    if down_factor is not None:
+        return int(final_size) * down_factor
+
+    up_factor = parse_scale_factor(class_name, "upsample_x")
+    if up_factor is not None:
+        if int(final_size) % up_factor != 0:
+            raise ValueError(
+                f"Class '{class_name}' is invalid for final_size={final_size}: "
+                f"final_size must be divisible by upsample factor {up_factor}."
+            )
+        crop_size = int(final_size) // up_factor
+        if crop_size < 1:
+            raise ValueError(f"Class '{class_name}' leads to invalid crop size {crop_size}.")
+        return crop_size
+
+    raise ValueError(
+        "Unknown class name '{class_name}'. Supported formats are: "
+        "original, JPEG, downsample_xK, upsample_xK (K is a positive integer).".format(class_name=class_name)
+    )
 
 
 def resolve_image_path(raise_dir: Path, rel_path: str) -> Path:
@@ -102,7 +131,7 @@ def make_final_image(
     interpolation: str,
     rng: np.random.Generator,
 ) -> tuple[Image.Image, Dict[str, Any]] | None:
-    crop_size = CLASS_CROP_SIZES[class_name]
+    crop_size = get_crop_size_for_class(class_name, final_size)
     try:
         with Image.open(source_path) as img:
             img = img.convert("RGB")
@@ -120,7 +149,7 @@ def make_final_image(
     if class_name == "JPEG":
         final_img = apply_jpeg_pil(crop, jpeg_quality)
         jpeg_value = int(jpeg_quality)
-    elif class_name.startswith("downsample"):
+    elif class_name.startswith("downsample") or class_name.startswith("upsample"):
         final_img = resize_to_final(crop, final_size, interpolation)
         interpolation_value = interpolation
     else:
@@ -205,11 +234,9 @@ def build_class_samples(
     limit_samples: int | None,
     show_progress: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, list[Dict[str, Any]]]:
-    if class_name not in CLASS_CROP_SIZES:
-        raise ValueError(f"Unknown class '{class_name}'.")
-
     data_cfg = config["data"]
     final_size = int(data_cfg["final_size"])
+    crop_size = get_crop_size_for_class(class_name, final_size)
     width_rfft = final_size // 2 + 1
     target_key = f"{split}_samples_per_class"
     target_per_class = int(data_cfg[target_key])
@@ -236,7 +263,7 @@ def build_class_samples(
         if attempts >= max_attempts:
             raise RuntimeError(
                 f"Could only generate {made}/{target_per_class} samples for {split}:{class_name}. "
-                f"Many images may be smaller than crop size {CLASS_CROP_SIZES[class_name]}."
+                f"Many images may be smaller than crop size {crop_size}."
             )
         attempts += 1
         source_entry = sources[int(rng.integers(0, len(sources)))]
