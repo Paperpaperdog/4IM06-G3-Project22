@@ -48,8 +48,15 @@ while IFS= read -r -d '' file; do
         echo "ADD (force) $rel ($size_h)"
         added=$((added + 1))
         ;;
+      results/*.md|results/**/*.npy|results/**/*.npz)
+        if (( DO_ADD )); then
+          git add -f "$rel"
+        fi
+        echo "ADD (force) $rel ($size_h)"
+        added=$((added + 1))
+        ;;
       *)
-        # figures/ may stay ignored until .gitignore is pulled; force-add png under size limit
+        # figures/ png may stay ignored until .gitignore is pulled; force-add under size limit
         if [[ "$rel" =~ ^results/.+/figures/ ]] && [[ "$rel" == *.png ]]; then
           if (( DO_ADD )); then
             git add -f "$rel"

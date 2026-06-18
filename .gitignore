@@ -52,6 +52,9 @@ runs/
 !results/**/logs/**
 !results/**/checkpoints/
 !results/**/checkpoints/*.pt
+!results/*.md
+!results/**/*.npy
+!results/**/*.npz
 
 # CNN: no vendored deps or large zips in git
 CNN/spectral-history-cnn/.pydeps_npu/
@@ -77,6 +80,9 @@ CNN/spectral-history-cnn/fusion_result.json
 *.h5
 *.hdf5
 !results/**/checkpoints/*.pt
+!results/*.md
+!results/**/*.npy
+!results/**/*.npz
 
 # Archives
 *.tar.gz
